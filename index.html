@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>在庫カウント 現場用</title>
+<title>在庫カウント</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -13,7 +13,6 @@
   --blue:#185FA5;--blue-bg:#E6F1FB;--blue-text:#0C447C;
   --red:#A32D2D;--red-bg:#FCEBEB;--red-text:#791F1F;
   --amber:#854F0B;--amber-bg:#FAEEDA;--amber-text:#633806;
-  --line:#06C755;--line-bg:#E8F9EE;--line-text:#04823A;
   --radius:12px;--radius-sm:8px;
 }
 body{font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Yu Gothic',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:80px;}
@@ -28,23 +27,20 @@ body{font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Yu Gothic',sans-se
 .prog-count{font-size:12px;color:var(--green);font-weight:600;}
 .prog-bar-out{height:4px;background:var(--border);border-radius:2px;}
 .prog-bar-in{height:4px;background:var(--green);border-radius:2px;transition:width .3s;}
+.sync-status{font-size:11px;margin-top:4px;}
+.sync-ok{color:var(--green);}
+.sync-err{color:var(--red);}
+.sync-ing{color:var(--text3);}
 .wrap{max-width:480px;margin:0 auto;padding:1rem;}
 .card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem;}
 h2{font-size:16px;font-weight:600;margin-bottom:4px;}
 .sub{font-size:13px;color:var(--text2);margin-bottom:1rem;line-height:1.5;}
-.file-block{border:1.5px dashed var(--border2);border-radius:var(--radius-sm);padding:1.5rem;text-align:center;cursor:pointer;background:var(--bg);margin-bottom:.75rem;}
-.file-block.loaded{border-style:solid;border-color:var(--green);background:var(--green-bg);}
-.fb-icon{font-size:32px;margin-bottom:8px;}
-.fb-title{font-size:15px;font-weight:600;}
-.fb-hint{font-size:12px;color:var(--text3);margin-top:4px;line-height:1.6;}
-.fb-ok{font-size:13px;color:var(--green-text);margin-top:6px;font-weight:600;}
-input[type=file]{display:none;}
 .btn{width:100%;padding:14px;border-radius:var(--radius-sm);border:none;font-size:15px;font-weight:600;cursor:pointer;margin-top:.75rem;display:block;text-align:center;}
 .btn-primary{background:var(--text);color:#fff;}
-.btn-primary.disabled{opacity:.25;cursor:default;}
 .btn-ghost{background:transparent;color:var(--text2);border:0.5px solid var(--border2);}
 .btn-green{background:var(--green);color:#fff;}
 .err{background:var(--red-bg);color:var(--red-text);border-radius:var(--radius-sm);padding:.75rem;font-size:13px;margin-top:.5rem;}
+.ok-box{background:var(--green-bg);border:0.5px solid var(--green);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:13px;color:var(--green-text);}
 .resume-box{background:var(--blue-bg);border:0.5px solid var(--blue);border-radius:var(--radius);padding:1rem 1.25rem;margin-bottom:1rem;}
 .resume-title{font-size:14px;font-weight:600;color:var(--blue-text);margin-bottom:4px;}
 .resume-sub{font-size:12px;color:var(--blue);margin-bottom:.75rem;}
@@ -52,6 +48,23 @@ input[type=file]{display:none;}
 .resume-btns button{flex:1;padding:10px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;border:none;}
 .rbtn-yes{background:var(--blue);color:#fff;}
 .rbtn-no{background:transparent;color:var(--blue-text);border:0.5px solid var(--blue)!important;}
+/* 営業所ボタン */
+.office-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:1rem;}
+.office-btn{width:100%;padding:16px 8px;border-radius:var(--radius);border:0.5px solid var(--border);background:var(--surface);cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;}
+.office-btn:active{opacity:.7;}
+.office-btn .office-icon{font-size:24px;}
+.office-btn .office-name{font-size:14px;font-weight:600;color:var(--text);}
+.office-btn.fukuoka{border-top:3px solid #185FA5;}
+.office-btn.fukuoka2{border-top:3px solid #5B9BD5;}
+.office-btn.hiroshima{border-top:3px solid #EF9F27;}
+.office-btn.hiroshima2{border-top:3px solid #C47A0A;}
+.office-btn.shikoku{border-top:3px solid #1D9E75;}
+.office-btn.minamikyu{border-top:3px solid #A32D2D;}
+/* ローディング */
+.loading-box{text-align:center;padding:2rem 1rem;}
+.loading-icon{font-size:40px;animation:spin 1s linear infinite;display:inline-block;}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.loading-text{font-size:14px;color:var(--text2);margin-top:1rem;}
 /* カテゴリ */
 .cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:1rem;}
 .cat-btn{width:100%;padding:18px 10px;border-radius:var(--radius);border:0.5px solid var(--border);background:var(--surface);font-size:14px;font-weight:600;color:var(--text);cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;}
@@ -119,24 +132,17 @@ input[type=file]{display:none;}
 .mv.blue{color:var(--blue);}
 .ml{font-size:11px;color:var(--text3);margin-top:2px;}
 .stw{overflow-x:auto;border:0.5px solid var(--border);border-radius:var(--radius-sm);margin-top:.5rem;}
-.st{width:100%;border-collapse:collapse;font-size:12px;min-width:360px;}
+.st{width:100%;border-collapse:collapse;font-size:12px;min-width:300px;}
 .st th{background:var(--bg);color:var(--text2);font-weight:600;padding:8px 10px;text-align:left;border-bottom:0.5px solid var(--border);white-space:nowrap;}
 .st td{padding:8px 10px;border-bottom:0.5px solid var(--border);color:var(--text);}
 .st tr:last-child td{border-bottom:none;}
-.st tr.rs td{background:#FCEBEB18;}
-.st tr.ro td{background:#E6F1FB18;}
-.st tr.rk td{background:#EAF3DE18;}
-.hc{font-size:11px;font-family:monospace;}
+.st tr.rok td{background:#EAF3DE18;}
+.st tr.rsh td{background:#FCEBEB18;}
+.st tr.rov td{background:#E6F1FB18;}
 .db{font-size:11px;padding:2px 7px;border-radius:var(--radius-sm);font-weight:600;}
 .dok{background:var(--green-bg);color:var(--green-text);}
 .dover{background:var(--blue-bg);color:var(--blue-text);}
 .dshort{background:var(--red-bg);color:var(--red-text);}
-/* LINE送信ガイド */
-.line-guide{background:var(--line-bg);border:0.5px solid var(--line);border-radius:var(--radius);padding:1rem 1.25rem;margin-bottom:1rem;}
-.line-guide h3{font-size:14px;font-weight:600;color:var(--line-text);margin-bottom:.5rem;}
-.line-step{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;}
-.line-num{min-width:20px;height:20px;border-radius:50%;background:var(--line);color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;}
-.line-text{font-size:12px;color:var(--line-text);line-height:1.5;}
 .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;z-index:999;animation:fadeInOut 2.2s ease forwards;white-space:nowrap;}
 @keyframes fadeInOut{0%{opacity:0;transform:translateX(-50%) translateY(10px)}15%{opacity:1;transform:translateX(-50%) translateY(0)}75%{opacity:1}100%{opacity:0}}
 </style>
@@ -144,11 +150,12 @@ input[type=file]{display:none;}
 <body>
 <div class="header">
   <h1>在庫カウント<span class="office-badge" id="office-badge" style="display:none"></span><span class="date-badge" id="date-badge" style="display:none"></span></h1>
-  <div class="header-sub" id="header-sub">データファイルを読み込んでください</div>
+  <div class="header-sub" id="header-sub">営業所を選択してください</div>
 </div>
 <div id="progress-sticky" style="display:none;" class="progress-sticky">
   <div class="prog-row"><span class="prog-label" id="prog-label"></span><span class="prog-count" id="prog-count"></span></div>
   <div class="prog-bar-out"><div class="prog-bar-in" id="prog-bar" style="width:0%"></div></div>
+  <div class="sync-status" id="sync-status"></div>
 </div>
 <div id="app" class="wrap"></div>
 <div id="bottom-bar" style="display:none;" class="bottom-bar">
@@ -158,7 +165,21 @@ input[type=file]{display:none;}
 </div>
 
 <script>
-const SAVE_KEY='genba_save_v1';
+// ===== 設定 =====
+const GAS_URL='https://script.google.com/macros/s/AKfycbwdMcLiTAaZaf6Zt-3IK4sqk95nEkliUZpO9_lf1tmaPVduCBVX0pmXIrAHGRgmYgdBLw/exec';
+const GITHUB_USER='kawasakifamilia1121-byte';
+const GITHUB_REPO='zaiko-count';
+const GITHUB_BRANCH='main';
+
+const OFFICES=[
+  {key:'福岡1',name:'福岡1',icon:'🏢',cls:'fukuoka'},
+  {key:'福岡2',name:'福岡2',icon:'🏢',cls:'fukuoka2'},
+  {key:'広島1',name:'広島1',icon:'🏢',cls:'hiroshima'},
+  {key:'広島2',name:'広島2',icon:'🏢',cls:'hiroshima2'},
+  {key:'四国', name:'四国', icon:'🏢',cls:'shikoku'},
+  {key:'南九州',name:'南九州',icon:'🏢',cls:'minamikyu'},
+];
+const SAVE_KEY='genba_save_v2';
 const CAT_DEFS=[
   {key:'家電_新品',label:'家電',status:'新品',cc:'denki shinpin'},
   {key:'家電_中古',label:'家電',status:'中古',cc:'denki chuko'},
@@ -168,7 +189,7 @@ const CAT_DEFS=[
   {key:'布団・カーテン_中古',label:'布団・カーテン',status:'中古',cc:'futon chuko'},
 ];
 
-let currentOffice='',currentDate='',allItems=[],counts={},notes={};
+let currentOffice=null,currentDate='',allItems=[],counts={},notes={};
 let currentCatDef=null,currentCatItems=[];
 
 function hs(s){document.getElementById('header-sub').textContent=s;}
@@ -182,111 +203,122 @@ function sp(label,done,total){
   document.getElementById('prog-count').textContent=`${done} / ${total}件完了`;
   document.getElementById('prog-bar').style.width=`${Math.round(done/total*100)}%`;
 }
+function sss(msg,type){const el=document.getElementById('sync-status');if(el){el.className=`sync-status sync-${type}`;el.textContent=msg;}}
 function sbb(show){const bb=document.getElementById('bottom-bar');if(bb)bb.style.display=show?'flex':'none';}
 function toast(msg){const o=document.querySelector('.toast');if(o)o.remove();const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>{if(t.parentNode)t.remove();},2300);}
 function saveP(){
-  try{localStorage.setItem(SAVE_KEY,JSON.stringify({office:currentOffice,date:currentDate,allItems,counts,notes,catKey:currentCatDef?.key,savedAt:new Date().toISOString()}));toast('💾 保存しました');}catch(e){toast('保存失敗');}
+  try{localStorage.setItem(SAVE_KEY,JSON.stringify({office:currentOffice?.key,date:currentDate,allItems,counts,notes,catKey:currentCatDef?.key,savedAt:new Date().toISOString()}));toast('💾 保存しました');}
+  catch(e){toast('保存失敗');}
 }
 function loadSave(){try{const s=localStorage.getItem(SAVE_KEY);return s?JSON.parse(s):null;}catch(e){return null;}}
 function clearSave(){try{localStorage.removeItem(SAVE_KEY);}catch(e){}}
 
-// ===== 画面1：データ読み込み =====
-function renderLoad(){
-  sob('');sdb('');hs('データファイルを読み込んでください');sp('',0,0);sbb(false);
+// GitHubからデータ取得
+async function fetchOfficeData(officeKey){
+  const fileName=`data/${encodeURIComponent(officeKey)}.json`;
+  const url=`https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${fileName}`;
+  const res=await fetch(url+'?t='+Date.now());
+  if(!res.ok)throw new Error('データが見つかりません。本部がまだアップロードしていない可能性があります。');
+  return await res.json();
+}
+
+// GASへ送信
+async function syncToGAS(items){
+  if(!GAS_URL)return;
+  sss('📡 送信中...','ing');
+  try{
+    const payload={action:'saveResult',office:currentOffice.name,items:items.map(it=>{
+      const g=allItems.indexOf(it);
+      return{hinban:it.hinban,name:it.name,status:it.status,cat:it.cat,core:it.core,real:counts[g]??null,memo:notes[g]||''};
+    })};
+    await fetch(GAS_URL,{method:'POST',body:JSON.stringify(payload),headers:{'Content-Type':'application/json'}});
+    sss('✓ スプレッドシートに送信済み','ok');
+  }catch(e){sss('⚠ 送信失敗（オフライン？）','err');}
+}
+
+// ===== 画面1：営業所選択 =====
+function renderOfficeSelect(){
+  currentOffice=null;sob('');sdb('');hs('営業所を選択してください');sp('',0,0);sbb(false);
   const saved=loadSave();
   let resumeHtml='';
   if(saved?.allItems?.length>0){
     const d=new Date(saved.savedAt);const ds=`${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
     const dc=Object.keys(saved.counts||{}).length;
-    resumeHtml=`<div class="resume-box"><div class="resume-title">途中保存データがあります</div><div class="resume-sub">${saved.office} / ${saved.date} / ${ds}保存 / ${dc}件カウント済み</div><div class="resume-btns"><button class="rbtn-yes" id="ryes">続きから再開</button><button class="rbtn-no" id="rno">新しく始める</button></div></div>`;
+    const offName=OFFICES.find(o=>o.key===saved.office)?.name||saved.office||'';
+    resumeHtml=`<div class="resume-box"><div class="resume-title">途中保存データがあります</div><div class="resume-sub">${offName} / ${saved.date||''} / ${dc}件カウント済み</div><div class="resume-btns"><button class="rbtn-yes" id="ryes">続きから再開</button><button class="rbtn-no" id="rno">新しく始める</button></div></div>`;
   }
+  const offBtns=OFFICES.map(o=>`<button class="office-btn ${o.cls}" data-key="${o.key}"><span class="office-icon">${o.icon}</span><span class="office-name">${o.name}</span></button>`).join('');
   document.getElementById('app').innerHTML=`
     ${resumeHtml}
-    <div id="safari-guide" style="background:#FFF8E7;border:0.5px solid #EF9F27;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;">
-      <div style="font-size:14px;font-weight:700;color:#633806;margin-bottom:.5rem;">⚠️ LINEで開いている方へ</div>
-      <div style="font-size:12px;color:#854F0B;margin-bottom:.75rem;line-height:1.6;">LINEの内蔵ブラウザではファイルの保存ができません。必ずSafariで開いてください。</div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:8px;padding:10px 12px;">
-          <div style="min-width:26px;height:26px;border-radius:50%;background:#EF9F27;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;">1</div>
-          <div style="font-size:13px;color:#633806;">画面右下の <strong>「・・・」</strong> または右上の <strong>共有ボタン</strong> をタップ</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:8px;padding:10px 12px;">
-          <div style="min-width:26px;height:26px;border-radius:50%;background:#EF9F27;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;">2</div>
-          <div style="font-size:13px;color:#633806;"><strong>「Safariで開く」</strong> を選択</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:8px;padding:10px 12px;">
-          <div style="min-width:26px;height:26px;border-radius:50%;background:#EF9F27;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;">3</div>
-          <div style="font-size:13px;color:#633806;">Safariで開いたら、下部の <strong>共有ボタン（□↑）</strong> →「ブックマークに追加」で保存</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:8px;padding:10px 12px;">
-          <div style="min-width:26px;height:26px;border-radius:50%;background:#EF9F27;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;">💡</div>
-          <div style="font-size:12px;color:#633806;">次回からはブックマークから直接開けます。LINEで開く必要はありません。</div>
-        </div>
-      </div>
-      <button onclick="document.getElementById('safari-guide').style.display='none'" style="width:100%;margin-top:.75rem;padding:10px;border-radius:8px;border:0.5px solid #EF9F27;background:transparent;color:#854F0B;font-size:13px;font-weight:600;cursor:pointer;">Safariで開いているので非表示にする</button>
-    </div>
     <div class="card">
-      <h2>📂 データファイルを読み込む</h2>
-      <p class="sub">本部からLINEで送られてきたJSONファイルを選択してください</p>
-      <label class="file-block" id="fbj" for="fj">
-        <div class="fb-icon">📨</div>
-        <div class="fb-title">カウントデータ（JSON）</div>
-        <div class="fb-hint">本部から受け取ったファイルを選択<br>例：カウントデータ_福岡1_20260514.json</div>
-        <div class="fb-ok" id="okj" style="display:none;"></div>
-      </label>
-      <input type="file" id="fj" accept=".json">
-      <div id="emsg"></div>
+      <h2>営業所を選択</h2>
+      <p class="sub">担当の営業所を選んでください。データは自動で読み込まれます。</p>
+      <div class="office-grid">${offBtns}</div>
     </div>`;
-
   if(saved?.allItems?.length>0){
     document.getElementById('ryes').addEventListener('click',()=>resumeFromSave(saved));
-    document.getElementById('rno').addEventListener('click',()=>{clearSave();renderLoad();});
+    document.getElementById('rno').addEventListener('click',()=>{clearSave();renderOfficeSelect();});
   }
-
-  document.getElementById('fj').addEventListener('change',e=>{
-    const f=e.target.files[0];if(!f)return;
-    const r=new FileReader();
-    r.onload=ev=>{
-      try{
-        const data=JSON.parse(ev.target.result);
-        if(!data.office||!data.items)throw new Error('ファイル形式が正しくありません');
-        currentOffice=data.office;currentDate=data.date||'';
-        allItems=data.items;counts={};notes={};
-        sob(currentOffice);sdb(currentDate);
-        clearSave();
-        renderCatSelect();
-        toast(`✓ ${currentOffice}（${currentDate}）のデータを読み込みました`);
-      }catch(err){
-        document.getElementById('emsg').innerHTML=`<div class="err">ファイルの読み込みに失敗しました：${err.message}</div>`;
-      }
-    };
-    r.readAsText(f);
+  document.querySelectorAll('.office-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      currentOffice=OFFICES.find(o=>o.key===btn.dataset.key);
+      sob(currentOffice.name);loadOfficeData();
+    });
   });
 }
 
 function resumeFromSave(saved){
-  currentOffice=saved.office;currentDate=saved.date||'';
-  allItems=saved.allItems;counts=saved.counts||{};notes=saved.notes||{};
-  sob(currentOffice);sdb(currentDate);
+  currentOffice=OFFICES.find(o=>o.key===saved.office)||{key:saved.office,name:saved.office};
+  sob(currentOffice.name);sdb(saved.date||'');
+  allItems=saved.allItems;counts=saved.counts||{};notes=saved.notes||{};currentDate=saved.date||'';
   const def=CAT_DEFS.find(c=>c.key===saved.catKey);
   if(def){currentCatDef=def;currentCatItems=allItems.filter(it=>it.cat===def.label&&it.status===def.status);renderList();}
   else renderCatSelect();
 }
 
+// ===== GitHubからデータ読み込み =====
+async function loadOfficeData(){
+  hs(`${currentOffice.name} — データ読み込み中...`);
+  document.getElementById('app').innerHTML=`
+    <div class="card">
+      <div class="loading-box">
+        <div class="loading-icon">⏳</div>
+        <div class="loading-text">${currentOffice.name}のデータを取得しています...</div>
+      </div>
+    </div>`;
+  sbb(false);
+  try{
+    const data=await fetchOfficeData(currentOffice.key);
+    currentDate=data.date||'';sdb(currentDate);
+    allItems=data.items||[];counts={};notes={};
+    clearSave();
+    renderCatSelect();
+    toast(`✓ ${currentOffice.name}（${currentDate}）のデータを読み込みました`);
+  }catch(err){
+    document.getElementById('app').innerHTML=`
+      <div class="card">
+        <h2>データの読み込みに失敗</h2>
+        <div class="err" style="margin-top:.75rem;">${err.message}</div>
+        <button class="btn btn-ghost" id="bk">← 営業所選択に戻る</button>
+      </div>`;
+    document.getElementById('bk').addEventListener('click',renderOfficeSelect);
+  }
+}
+
 // ===== 画面2：カテゴリ選択 =====
 function renderCatSelect(){
-  hs(`${currentOffice} — 担当を選択`);sp('',0,0);sbb(false);
+  hs(`${currentOffice.name} — 担当を選択`);sp('',0,0);sbb(false);
   const cdm={};
   CAT_DEFS.forEach(def=>{const its=allItems.filter(it=>it.cat===def.label&&it.status===def.status);const dn=its.filter(it=>counts[allItems.indexOf(it)]!==undefined).length;cdm[def.key]={total:its.length,done:dn};});
   const bts=CAT_DEFS.map(def=>{
-    const{total,done}=cdm[def.key];
-    if(total===0)return'';
+    const{total,done}=cdm[def.key];if(total===0)return'';
     const dh=done>0?`<span class="cat-done">✓ ${done}/${total}件済み</span>`:`<span class="cat-count">${total}件</span>`;
     return`<button class="cat-btn ${def.cc}" data-key="${def.key}"><span>${def.label}</span><span class="csb">${def.status}</span>${dh}</button>`;
   }).join('');
   document.getElementById('app').innerHTML=`
-    <div class="card"><h2>${currentOffice} 担当を選択</h2><p class="sub">${currentDate}　自分の担当カテゴリを選んでください</p><div class="cat-grid">${bts}</div></div>
-    <button class="btn btn-ghost" id="bkload">← ファイル読み込みに戻る</button>
+    <div class="card"><h2>${currentOffice.name} 担当を選択</h2><p class="sub">${currentDate}　自分の担当カテゴリを選んでください</p><div class="cat-grid">${bts}</div></div>
+    <button class="btn btn-ghost" id="bkoff">← 営業所選択に戻る</button>
+    <button class="btn btn-ghost" id="reload">🔄 データを再読み込み</button>
     <button class="btn btn-ghost" id="clrs">やり直す</button>`;
   document.querySelectorAll('.cat-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
@@ -294,7 +326,8 @@ function renderCatSelect(){
       currentCatDef=def;currentCatItems=allItems.filter(it=>it.cat===def.label&&it.status===def.status);renderList();
     });
   });
-  document.getElementById('bkload').addEventListener('click',renderLoad);
+  document.getElementById('bkoff').addEventListener('click',renderOfficeSelect);
+  document.getElementById('reload').addEventListener('click',loadOfficeData);
   document.getElementById('clrs').addEventListener('click',()=>{clearSave();counts={};notes={};renderCatSelect();});
 }
 
@@ -303,7 +336,8 @@ function renderList(){
   const def=currentCatDef;const items=currentCatItems;
   const tl=`${def.label}（${def.status}）`;
   const done=items.filter(it=>counts[allItems.indexOf(it)]!==undefined).length;
-  hs(`${currentOffice} ${tl}`);sp(tl,done,items.length);sbb(true);
+  hs(`${currentOffice.name} ${tl}`);sp(tl,done,items.length);sbb(true);
+  sss('✓ 答え合わせのたびにスプレッドシートへ自動送信','ok');
   let html='<div class="item-list">';
   items.forEach((it,i)=>{
     const g=allItems.indexOf(it);const val=counts[g];const note=notes[g]||'';const hv=val!==undefined;
@@ -314,7 +348,6 @@ function renderList(){
   });
   html+='</div>';
   document.getElementById('app').innerHTML=html;
-
   document.querySelectorAll('.ich').forEach(h=>{
     h.addEventListener('click',()=>{
       const i=parseInt(h.dataset.idx);const a=document.getElementById(`ia-${i}`);const op=a.classList.contains('open');
@@ -338,6 +371,7 @@ function renderList(){
       const inp=document.getElementById(`inp-${i}`);const val=parseInt(inp.value);if(isNaN(val))return;
       counts[g]=val;const nt=document.getElementById(`nt-${i}`);if(nt)notes[g]=nt.value||'';
       saveP();rcCard(i,it,val,g);upProg();
+      syncToGAS([it]);
     });
   });
   document.querySelectorAll('.note-input').forEach(n=>{
@@ -345,8 +379,8 @@ function renderList(){
     n.addEventListener('click',e=>e.stopPropagation());
   });
   document.getElementById('bb-back').onclick=renderCatSelect;
-  document.getElementById('bb-save').onclick=saveP;
-  document.getElementById('bb-done').onclick=()=>{saveP();renderResult();};
+  document.getElementById('bb-save').onclick=()=>{saveP();syncToGAS(currentCatItems);};
+  document.getElementById('bb-done').onclick=()=>{saveP();syncToGAS(currentCatItems);renderResult();};
 }
 
 function jiHtml(match,diff,core,real){
@@ -369,7 +403,7 @@ function upProg(){
   sp(`${currentCatDef.label}（${currentCatDef.status}）`,done,currentCatItems.length);
 }
 
-// ===== 画面4：集計・CSV出力 =====
+// ===== 画面4：集計 =====
 function renderResult(){
   const def=currentCatDef;const tl=`${def.label}（${def.status}）`;
   const counted=currentCatItems.map(it=>{const g=allItems.indexOf(it);return{...it,g,real:counts[g],diff:counts[g]!==undefined?counts[g]-it.core:null};}).filter(d=>d.diff!==null);
@@ -379,18 +413,16 @@ function renderResult(){
   const st=si.reduce((s,d)=>s+d.diff,0);const ot=oi.reduce((s,d)=>s+d.diff,0);
   const acc=counted.length>0?Math.round((mc/counted.length)*100):0;
   const dc=td===0?'green':td>0?'blue':'red';const ds=td>0?'+':'';
-  hs(`${currentOffice} ${tl} 集計`);sp('',0,0);sbb(false);
-
+  hs(`${currentOffice.name} ${tl} 集計`);sp('',0,0);sbb(false);
   const tr=currentCatItems.map(it=>{
     const g=allItems.indexOf(it);const r=counts[g]!==undefined?counts[g]:null;const d=r!==null?r-it.core:null;const m=d===0;
-    const rc2=d===null?'':m?'rk':d>0?'ro':'rs';
+    const rc2=d===null?'':m?'rok':d>0?'rov':'rsh';
     const db=d!==null?`<span class="db ${m?'dok':d>0?'dover':'dshort'}">${d>0?'+':''}${d}</span>`:'<span style="color:var(--text3);font-size:11px;">未入力</span>';
-    return`<tr class="${rc2}"><td class="hc">${it.hinban}</td><td>${it.name}</td><td style="text-align:center;">${it.core}</td><td style="text-align:center;">${r!==null?r:'—'}</td><td style="text-align:center;">${db}</td></tr>`;
+    return`<tr class="${rc2}"><td>${it.name}</td><td style="text-align:center;">${it.core}</td><td style="text-align:center;">${r!==null?r:'—'}</td><td style="text-align:center;">${db}</td></tr>`;
   }).join('');
-
   document.getElementById('app').innerHTML=`
     <div class="card">
-      <div style="font-size:15px;font-weight:700;margin-bottom:.75rem;">${currentOffice} ${tl} 誤差サマリー</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:.75rem;">${currentOffice.name} ${tl}</div>
       <div class="mg">
         <div class="mc"><div class="mv ${dc}">${ds}${td}</div><div class="ml">総差異</div></div>
         <div class="mc"><div class="mv red">${si.length}</div><div class="ml">不足商品数</div></div>
@@ -399,67 +431,18 @@ function renderResult(){
         <div class="mc"><div class="mv red">${st}</div><div class="ml">不足合計</div></div>
         <div class="mc"><div class="mv blue">+${ot}</div><div class="ml">超過合計</div></div>
       </div>
-      <div class="stw"><table class="st"><thead><tr><th>品番</th><th>商品名</th><th>コア在庫</th><th>実在庫</th><th>差異</th></tr></thead><tbody>${tr}</tbody></table></div>
-    </div>
-    <div class="line-guide">
-      <h3>📤 結果を本部に送る手順</h3>
-      <div class="line-step"><div class="line-num">1</div><div class="line-text">「📥 CSVをダウンロード」を押す → ファイルアプリに保存される</div></div>
-      <div class="line-step"><div class="line-num">2</div><div class="line-text">LINEを開いて本部のトークを選ぶ</div></div>
-      <div class="line-step"><div class="line-num">3</div><div class="line-text">トーク画面の左下「＋」→「ファイル」→ダウンロードしたCSVを選んで送信</div></div>
-    </div>
-    <button class="btn btn-green" id="exp">📥 CSVをダウンロード</button>
-    <div id="line-send-guide" style="display:none;background:#E8F9EE;border:0.5px solid #06C755;border-radius:12px;padding:1rem 1.25rem;margin-top:.75rem;">
-      <div style="font-size:14px;font-weight:600;color:#04823A;margin-bottom:.75rem;">✅ ダウンロード完了！LINEで送る手順</div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:8px;padding:10px 12px;">
-          <div style="min-width:28px;height:28px;border-radius:50%;background:#06C755;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;">1</div>
-          <div style="font-size:13px;color:#04823A;">LINEを開いて<strong>本部のトーク</strong>を選ぶ</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:8px;padding:10px 12px;">
-          <div style="min-width:28px;height:28px;border-radius:50%;background:#06C755;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;">2</div>
-          <div style="font-size:13px;color:#04823A;">左下の <strong>「＋」</strong> をタップ</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:8px;padding:10px 12px;">
-          <div style="min-width:28px;height:28px;border-radius:50%;background:#06C755;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;">3</div>
-          <div style="font-size:13px;color:#04823A;"><strong>「ファイル」</strong> を選択 → ダウンロードしたCSVを選んで送信</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:8px;padding:10px 12px;">
-          <div style="min-width:28px;height:28px;border-radius:50%;background:#06C755;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;">💡</div>
-          <div style="font-size:12px;color:#04823A;">ファイルが見つからない場合は「ファイル」アプリの<strong>「ダウンロード」</strong>フォルダを確認してください</div>
-        </div>
-      </div>
+      <div class="ok-box" style="margin-bottom:.75rem;">✓ スプレッドシートに自動送信済みです</div>
+      <div class="stw"><table class="st"><thead><tr><th>商品名</th><th>コア在庫</th><th>実在庫</th><th>差異</th></tr></thead><tbody>${tr}</tbody></table></div>
     </div>
     <button class="btn btn-ghost" id="bkl">← カウントに戻る</button>
     <button class="btn btn-ghost" id="bkc">別の担当をカウントする</button>
-    <button class="btn btn-ghost" id="bkload">別のデータを読み込む</button>`;
-
-  document.getElementById('exp').addEventListener('click',exportCSV);
+    <button class="btn btn-ghost" id="bkoff">別の営業所に切り替える</button>`;
   document.getElementById('bkl').addEventListener('click',renderList);
   document.getElementById('bkc').addEventListener('click',renderCatSelect);
-  document.getElementById('bkload').addEventListener('click',renderLoad);
+  document.getElementById('bkoff').addEventListener('click',renderOfficeSelect);
 }
 
-function exportCSV(){
-  const today=new Date();
-  const dateStr=`${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
-  const tl=`${currentCatDef.label}_${currentCatDef.status}`;
-  let csv='\uFEFF'+'営業所,品番,カテゴリ,商品状態,商品名,コア在庫,実在庫,差異,一致,メモ\n';
-  currentCatItems.forEach(it=>{
-    const g=allItems.indexOf(it);const r=counts[g]!==undefined?counts[g]:'';
-    const d=r!==''?r-it.core:'';const m=r!==''?(r===it.core?'○':'×'):'';
-    const n=(notes[g]||'').replace(/,/g,'、');
-    csv+=`${currentOffice},${it.hinban},${it.cat},${it.status||''},${it.name},${it.core},${r},${d},${m},${n}\n`;
-  });
-  const blob=new Blob([csv],{type:'text/csv'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download=`カウント結果_${currentOffice}_${tl}_${dateStr}.csv`;a.click();
-  // ダウンロード後にLINE送信ガイドを表示
-  const guide=document.getElementById('line-send-guide');
-  if(guide){guide.style.display='block';guide.scrollIntoView({behavior:'smooth',block:'nearest'});}
-  toast('📥 ダウンロード完了！LINEで本部に送ってください');
-}
-
-renderLoad();
+renderOfficeSelect();
 </script>
 </body>
 </html>
