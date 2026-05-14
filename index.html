@@ -143,6 +143,28 @@ h2{font-size:16px;font-weight:600;margin-bottom:4px;}
 .dok{background:var(--green-bg);color:var(--green-text);}
 .dover{background:var(--blue-bg);color:var(--blue-text);}
 .dshort{background:var(--red-bg);color:var(--red-text);}
+/* 一覧表示 */
+.list-table{width:100%;border-collapse:collapse;}
+.list-row{display:flex;align-items:center;padding:11px 14px;border-bottom:0.5px solid var(--border);cursor:pointer;background:var(--surface);gap:10px;}
+.list-row:active{background:var(--bg);}
+.list-row.done-ok{background:#EAF3DE22;border-left:3px solid var(--green);}
+.list-row.done-over{background:#E6F1FB22;border-left:3px solid var(--blue);}
+.list-row.done-short{background:#FCEBEB22;border-left:3px solid var(--red);}
+.list-num{font-size:11px;color:var(--text3);width:20px;flex-shrink:0;text-align:right;}
+.list-name{flex:1;min-width:0;}
+.list-item-name{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.list-item-meta{font-size:11px;color:var(--text3);margin-top:1px;}
+.list-status{flex-shrink:0;text-align:right;}
+.list-badge{font-size:12px;font-weight:600;padding:3px 8px;border-radius:var(--radius-sm);}
+.list-pend{font-size:12px;color:var(--text3);}
+.list-arrow{font-size:14px;color:var(--text3);margin-left:4px;flex-shrink:0;}
+/* カウント入力画面 */
+.count-screen{padding:1rem;}
+.count-back{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);cursor:pointer;margin-bottom:1rem;font-weight:600;}
+.count-back:active{opacity:.7;}
+.count-nav{display:flex;gap:8px;margin-top:1rem;}
+.count-nav button{flex:1;padding:11px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);}
+.count-nav button:active{opacity:.7;}
 .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;z-index:999;animation:fadeInOut 2.2s ease forwards;white-space:nowrap;}
 @keyframes fadeInOut{0%{opacity:0;transform:translateX(-50%) translateY(10px)}15%{opacity:1;transform:translateX(-50%) translateY(0)}75%{opacity:1}100%{opacity:0}}
 </style>
@@ -336,56 +358,121 @@ function renderCatSelect(){
   document.getElementById('clrs').addEventListener('click',()=>{clearSave();counts={};notes={};renderCatSelect();});
 }
 
-// ===== 画面3：商品リスト =====
+// ===== 画面3：商品一覧（引き表示） =====
 function renderList(){
   const def=currentCatDef;const items=currentCatItems;
   const tl=`${def.label}（${def.status}）`;
   const done=items.filter(it=>counts[allItems.indexOf(it)]!==undefined).length;
   hs(`${currentOffice.name} ${tl}`);sp(tl,done,items.length);sbb(true);
   sss('✓ 答え合わせのたびにスプレッドシートへ自動送信','ok');
-  let html='<div class="item-list">';
+
+  let html='<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:1rem;">';
   items.forEach((it,i)=>{
-    const g=allItems.indexOf(it);const val=counts[g];const note=notes[g]||'';const hv=val!==undefined;
+    const g=allItems.indexOf(it);const val=counts[g];const hv=val!==undefined;
     const diff=hv?val-it.core:null;const match=diff===0;
-    let cc='item-card';let rh='<span class="rpend">未入力</span>';
-    if(hv){if(match){cc+=' counted';rh=`<span class="rb rok">⭕ 一致</span>`;}else if(diff>0){cc+=' counted';rh=`<span class="rb rover">+${diff}</span>`;}else{cc+=' counted-diff';rh=`<span class="rb rshort">${diff}</span>`;}}
-    html+=`<div class="${cc}" id="card-${i}"><div class="ich" data-idx="${i}"><div class="ii"><div class="item-name">${it.name}</div><div class="item-meta"><span class="item-hinban">${it.hinban}</span></div></div><div class="ir"><div><div class="cls">コア在庫</div><div class="cv${hv?' revealed':''}" id="cv-${i}">${it.core}</div></div>${rh}</div></div><div class="iia" id="ia-${i}"><div class="idv"></div><input class="cnt-input" type="number" min="0" id="inp-${i}" value="${hv?val:''}" placeholder="0" inputmode="numeric" data-idx="${i}"><div class="cbr"><button class="cb minus" data-idx="${i}" data-d="-1">－</button><button class="cb plus" data-idx="${i}" data-d="1">＋</button></div><button class="ab${hv?'':' disabled'}" id="ab-${i}" data-idx="${i}">答え合わせする</button>${hv&&diff!==null?jiHtml(match,diff,it.core,val):''}<textarea class="note-input" id="nt-${i}" placeholder="メモ（任意）" rows="2" data-idx="${i}">${note}</textarea></div></div>`;
+    let rc='list-row';let badge='<span class="list-pend">未入力</span>';
+    if(hv){
+      if(match){rc+=' done-ok';badge=`<span class="list-badge rok">⭕</span>`;}
+      else if(diff>0){rc+=' done-over';badge=`<span class="list-badge rover">+${diff}</span>`;}
+      else{rc+=' done-short';badge=`<span class="list-badge rshort">${diff}</span>`;}
+    }
+    html+=`<div class="${rc}" data-idx="${i}">
+      <div class="list-num">${i+1}</div>
+      <div class="list-name">
+        <div class="list-item-name">${it.name}</div>
+        <div class="list-item-meta">コア在庫: ${it.core}　品番: ${it.hinban}</div>
+      </div>
+      <div class="list-status">${badge}</div>
+      <div class="list-arrow">›</div>
+    </div>`;
   });
   html+='</div>';
   document.getElementById('app').innerHTML=html;
-  document.querySelectorAll('.ich').forEach(h=>{
-    h.addEventListener('click',()=>{
-      const i=parseInt(h.dataset.idx);const a=document.getElementById(`ia-${i}`);const op=a.classList.contains('open');
-      document.querySelectorAll('.iia').forEach(x=>x.classList.remove('open'));
-      if(!op){a.classList.add('open');document.getElementById(`cv-${i}`).classList.add('revealed');setTimeout(()=>document.getElementById(`card-${i}`).scrollIntoView({behavior:'smooth',block:'nearest'}),50);}
+
+  document.querySelectorAll('.list-row').forEach(row=>{
+    row.addEventListener('click',()=>{
+      const i=parseInt(row.dataset.idx);
+      renderCountScreen(i);
     });
   });
-  document.querySelectorAll('.cnt-input').forEach(inp=>{
-    inp.addEventListener('input',()=>{const i=parseInt(inp.dataset.idx);const b=document.getElementById(`ab-${i}`);if(b)b.className='ab'+(inp.value!==''&&!isNaN(parseInt(inp.value))?'':' disabled');});
-  });
-  document.querySelectorAll('.cb').forEach(btn=>{
-    btn.addEventListener('click',e=>{
-      e.stopPropagation();const i=parseInt(btn.dataset.idx);const d=parseInt(btn.dataset.d);
-      const inp=document.getElementById(`inp-${i}`);inp.value=String(Math.max(0,(parseInt(inp.value)||0)+d));inp.dispatchEvent(new Event('input'));
-    });
-  });
-  document.querySelectorAll('.ab').forEach(btn=>{
-    btn.addEventListener('click',e=>{
-      e.stopPropagation();if(btn.classList.contains('disabled'))return;
-      const i=parseInt(btn.dataset.idx);const it=items[i];const g=allItems.indexOf(it);
-      const inp=document.getElementById(`inp-${i}`);const val=parseInt(inp.value);if(isNaN(val))return;
-      counts[g]=val;const nt=document.getElementById(`nt-${i}`);if(nt)notes[g]=nt.value||'';
-      saveP();rcCard(i,it,val,g);upProg();
-      syncToGAS([it]);
-    });
-  });
-  document.querySelectorAll('.note-input').forEach(n=>{
-    n.addEventListener('change',()=>{const i=parseInt(n.dataset.idx);const g=allItems.indexOf(items[i]);notes[g]=n.value;});
-    n.addEventListener('click',e=>e.stopPropagation());
-  });
+
   document.getElementById('bb-back').onclick=renderCatSelect;
   document.getElementById('bb-save').onclick=()=>{saveP();syncToGAS(currentCatItems);};
   document.getElementById('bb-done').onclick=()=>{saveP();syncToGAS(currentCatItems);renderResult();};
+}
+
+// ===== 画面3b：カウント入力画面 =====
+function renderCountScreen(idx){
+  const items=currentCatItems;
+  const it=items[idx];const g=allItems.indexOf(it);
+  const val=counts[g];const hv=val!==undefined;
+  const diff=hv?val-it.core:null;const match=diff===0;
+  sp('',0,0);sbb(false);
+
+  document.getElementById('app').innerHTML=`
+    <div class="count-screen">
+      <div class="count-back" id="cb-back">‹ 一覧に戻る</div>
+      <div class="card" style="margin-bottom:1rem;">
+        <div style="font-size:12px;color:var(--text3);margin-bottom:4px;">${idx+1} / ${items.length}</div>
+        <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:6px;line-height:1.4;">${it.name}</div>
+        <div style="display:flex;gap:12px;">
+          <div style="font-size:12px;color:var(--text2);">品番：<span style="font-family:monospace;">${it.hinban}</span></div>
+          <div style="font-size:12px;color:var(--text2);">コア在庫：<strong>${it.core}</strong></div>
+        </div>
+        ${hv?jiHtml(match,diff,it.core,val):''}
+      </div>
+      <div class="card">
+        <input class="cnt-input" type="number" min="0" id="cnt-inp" value="${hv?val:''}" placeholder="0" inputmode="numeric">
+        <div class="cbr" style="margin-top:10px;">
+          <button class="cb minus" id="cb-minus">－</button>
+          <button class="cb plus" id="cb-plus">＋</button>
+        </div>
+        <button class="ab${hv?'':' disabled'}" id="cb-ab">答え合わせする</button>
+        <textarea class="note-input" id="cb-note" placeholder="メモ（任意）" rows="2" style="margin-top:8px;">${notes[g]||''}</textarea>
+      </div>
+      <div class="count-nav">
+        <button id="cn-prev" ${idx===0?'disabled style="opacity:.3;"':''}>‹ 前へ</button>
+        <button id="cn-next" ${idx===items.length-1?'disabled style="opacity:.3;"':''}>次へ ›</button>
+      </div>
+    </div>`;
+
+  document.getElementById('cb-back').addEventListener('click',()=>{
+    const def=currentCatDef;const tl=`${def.label}（${def.status}）`;
+    const done=items.filter(it=>counts[allItems.indexOf(it)]!==undefined).length;
+    hs(`${currentOffice.name} ${tl}`);sp(tl,done,items.length);sbb(true);
+    sss('✓ 答え合わせのたびにスプレッドシートへ自動送信','ok');
+    renderList();
+  });
+
+  const inp=document.getElementById('cnt-inp');
+  inp.addEventListener('input',()=>{
+    const b=document.getElementById('cb-ab');
+    if(b)b.className='ab'+(inp.value!==''&&!isNaN(parseInt(inp.value))?'':' disabled');
+  });
+
+  document.getElementById('cb-minus').addEventListener('click',()=>{
+    inp.value=String(Math.max(0,(parseInt(inp.value)||0)-1));inp.dispatchEvent(new Event('input'));
+  });
+  document.getElementById('cb-plus').addEventListener('click',()=>{
+    inp.value=String((parseInt(inp.value)||0)+1);inp.dispatchEvent(new Event('input'));
+  });
+
+  document.getElementById('cb-ab').addEventListener('click',()=>{
+    if(document.getElementById('cb-ab').classList.contains('disabled'))return;
+    const v=parseInt(inp.value);if(isNaN(v))return;
+    counts[g]=v;
+    const nt=document.getElementById('cb-note');if(nt)notes[g]=nt.value||'';
+    saveP();syncToGAS([it]);
+    // 答え合わせ後に次の商品へ自動移動（最後の商品は一覧へ）
+    if(idx<items.length-1){renderCountScreen(idx+1);}
+    else{renderList();}
+  });
+
+  document.getElementById('cn-prev')?.addEventListener('click',()=>{if(idx>0)renderCountScreen(idx-1);});
+  document.getElementById('cn-next')?.addEventListener('click',()=>{if(idx<items.length-1)renderCountScreen(idx+1);});
+
+  // 入力欄にフォーカス
+  setTimeout(()=>inp.focus(),100);
 }
 
 function jiHtml(match,diff,core,real){
