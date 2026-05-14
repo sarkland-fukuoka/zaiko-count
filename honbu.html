@@ -235,9 +235,12 @@ function render(){
     </div>
 
     <div class="card">
-      <h2>③ GitHubトークン設定</h2>
-      <p class="sub">現場アプリにデータを配布するために必要です。一度設定すれば保存されます。</p>
+      <h2>③ 各種設定</h2>
+      <p class="sub">一度設定すれば保存されます。</p>
+      <p style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:4px;">GitHubトークン</p>
       <input type="password" id="token-input" placeholder="ghp_xxxxxxxxxxxxxxxx" value="${token}">
+      <p style="font-size:13px;font-weight:600;color:var(--text2);margin-top:12px;margin-bottom:4px;">GAS URL（スプレッドシート連携）</p>
+      <input type="text" id="gas-url-input" placeholder="https://script.google.com/macros/s/..." value="${gasUrl}">
       <div id="token-msg"></div>
     </div>
 
@@ -297,6 +300,7 @@ function render(){
   });
 
   document.getElementById('token-input')?.addEventListener('change',e=>{saveToken(e.target.value.trim());});
+  document.getElementById('gas-url-input')?.addEventListener('change',e=>{saveGasUrl(e.target.value.trim());});
 
   document.getElementById('upload-all')?.addEventListener('click',async()=>{
     const token=document.getElementById('token-input').value.trim();
@@ -321,6 +325,7 @@ function render(){
       const today=new Date();
       const dateStr=`${today.getFullYear()}年${today.getMonth()+1}月${today.getDate()}日`;
 
+      const gasUrl=loadGasUrl();
       for(const office of offices){
         const officeItems=stockByOffice[office];
         const items=Object.values(officeItems).map(it=>{
@@ -328,9 +333,21 @@ function render(){
           if(m&&m.excluded)return null;
           return{hinban:m?m.hinban:'—',name:it.name,status:it.status,cat:m?m.cat||'未分類':'未分類',core:it.core};
         }).filter(Boolean);
+        // GitHubにJSONをアップロード
         const payload=JSON.stringify({office,date:dateStr,generatedAt:new Date().toISOString(),items},null,2);
         const fileName=`data/${office}.json`;
         await uploadToGitHub(fileName,payload,token);
+        // GASにシート初期化を送信（マスター順でシートを作成）
+        if(gasUrl){
+          try{
+            await fetch(gasUrl,{
+              method:'POST',
+              body:JSON.stringify({action:'initSheet',office,items}),
+              headers:{'Content-Type':'text/plain'},
+              mode:'no-cors'
+            });
+          }catch(e){}
+        }
         updateProgress(`${office} 完了`);
       }
 
