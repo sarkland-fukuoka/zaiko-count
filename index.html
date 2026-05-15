@@ -256,35 +256,41 @@ function clearSave(){
   try{localStorage.removeItem(SAVE_KEY);}catch(e){}
 }
 
-// ===== リアルタイム同期（30秒ごとにGitHubから取得） =====
+// ===== リアルタイム同期（30秒ごとにGASから取得） =====
+async function fetchResultsFromGAS(){
+  if(!currentOffice||!GAS_URL)return;
+  try{
+    const url=`${GAS_URL}?action=getResults&office=${encodeURIComponent(currentOffice.name)}&t=${Date.now()}`;
+    const res=await fetch(url);
+    if(!res.ok)return;
+    const data=await res.json();
+    if(data.status!=='ok'||!data.results?.length)return;
+    // 他の人がカウントした分をマージ（自分のカウントは上書きしない）
+    let updated=false;
+    data.results.forEach(r=>{
+      const g=allItems.findIndex(a=>a.name===r.name&&a.status===r.status);
+      if(g<0)return;
+      if(counts[g]===undefined&&r.real!==''&&r.real!==null&&r.real!==undefined){
+        counts[g]=Number(r.real);
+        if(r.memo)notes[g]=r.memo;
+        updated=true;
+      }
+    });
+    if(updated){
+      saveOfficeData(currentOffice.key,{office:currentOffice.key,date:currentDate,allItems,counts,notes,catKey:currentCatDef?.key,savedAt:new Date().toISOString()});
+      // 一覧画面を再描画
+      const listEl=document.querySelector('.list-row');
+      if(listEl)renderList();
+      sss('🔄 他の担当者のカウントを取得しました','ok');
+      setTimeout(()=>sss('✓ リアルタイム同期中','ok'),3000);
+    }
+  }catch(e){}
+}
+
 function startSync(){
   stopSync();
-  syncTimer=setInterval(async()=>{
-    if(!currentOffice)return;
-    try{
-      const data=await fetchOfficeData(currentOffice.key);
-      // 他の人がカウントした分をマージ（自分のカウントは上書きしない）
-      let updated=false;
-      (data.items||[]).forEach(it=>{
-        const g=allItems.findIndex(a=>a.name===it.name&&a.status===it.status);
-        if(g<0)return;
-        // GitHubのデータに実在庫が入っていて、自分がまだカウントしていない場合のみ反映
-        if(it.real!==null&&it.real!==undefined&&counts[g]===undefined){
-          counts[g]=it.real;
-          if(it.memo)notes[g]=it.memo;
-          updated=true;
-        }
-      });
-      if(updated){
-        saveP();
-        // 一覧画面を再描画
-        const listEl=document.querySelector('.list-row');
-        if(listEl)renderList();
-        sss('🔄 他の担当者のカウントを取得しました','ok');
-        setTimeout(()=>sss('✓ リアルタイム同期中','ok'),3000);
-      }
-    }catch(e){}
-  },30000); // 30秒ごと
+  fetchResultsFromGAS(); // 即座に1回取得
+  syncTimer=setInterval(fetchResultsFromGAS,30000); // 30秒ごと
   sss('✓ リアルタイム同期中','ok');
 }
 function stopSync(){
