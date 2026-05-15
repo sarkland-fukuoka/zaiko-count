@@ -77,6 +77,8 @@ h2{font-size:16px;font-weight:600;margin-bottom:4px;}
 .cat-btn.futon{border-top:3px solid #EF9F27;}
 .cat-done{font-size:11px;font-weight:600;color:var(--green);}
 .cat-count{font-size:11px;color:var(--text3);}
+.cat-clear-btn{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:var(--radius-sm);border:0.5px solid var(--red);background:#fff;color:var(--red);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1;}
+.cat-clear-btn:active{opacity:.7;}
 /* 商品リスト */
 .item-list{display:flex;flex-direction:column;gap:10px;padding:1rem;}
 .item-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;}
@@ -213,6 +215,7 @@ const CAT_DEFS=[
 
 let currentOffice=null,currentDate='',allItems=[],counts={},notes={};
 let currentCatDef=null,currentCatItems=[];
+let syncTimer=null; // リアルタイム同期タイマー
 
 function hs(s){document.getElementById('header-sub').textContent=s;}
 function sob(name){const b=document.getElementById('office-badge');if(name){b.textContent=name;b.style.display='inline-block';}else b.style.display='none';}
@@ -228,12 +231,65 @@ function sp(label,done,total){
 function sss(msg,type){const el=document.getElementById('sync-status');if(el){el.className=`sync-status sync-${type}`;el.textContent=msg;}}
 function sbb(show){const bb=document.getElementById('bottom-bar');if(bb)bb.style.display=show?'flex':'none';}
 function toast(msg){const o=document.querySelector('.toast');if(o)o.remove();const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>{if(t.parentNode)t.remove();},2300);}
+
+// ===== 営業所別データ保存 =====
+function officeKey(offKey){return `genba_${offKey}`;}
+function saveOfficeData(offKey,data){try{localStorage.setItem(officeKey(offKey),JSON.stringify(data));}catch(e){}}
+function loadOfficeData2(offKey){try{const s=localStorage.getItem(officeKey(offKey));return s?JSON.parse(s):null;}catch(e){return null;}}
+function clearOfficeData(offKey){try{localStorage.removeItem(officeKey(offKey));}catch(e){}}
+
 function saveP(){
-  try{localStorage.setItem(SAVE_KEY,JSON.stringify({office:currentOffice?.key,date:currentDate,allItems,counts,notes,catKey:currentCatDef?.key,savedAt:new Date().toISOString()}));toast('💾 保存しました');}
-  catch(e){toast('保存失敗');}
+  if(!currentOffice)return;
+  saveOfficeData(currentOffice.key,{office:currentOffice.key,date:currentDate,allItems,counts,notes,catKey:currentCatDef?.key,savedAt:new Date().toISOString()});
+  toast('💾 保存しました');
 }
-function loadSave(){try{const s=localStorage.getItem(SAVE_KEY);return s?JSON.parse(s):null;}catch(e){return null;}}
-function clearSave(){try{localStorage.removeItem(SAVE_KEY);}catch(e){}}
+function loadSave(){
+  // 後方互換のため旧キーも確認
+  if(currentOffice){
+    const d=loadOfficeData2(currentOffice.key);
+    if(d)return d;
+  }
+  try{const s=localStorage.getItem(SAVE_KEY);return s?JSON.parse(s):null;}catch(e){return null;}
+}
+function clearSave(){
+  if(currentOffice)clearOfficeData(currentOffice.key);
+  try{localStorage.removeItem(SAVE_KEY);}catch(e){}
+}
+
+// ===== リアルタイム同期（30秒ごとにGitHubから取得） =====
+function startSync(){
+  stopSync();
+  syncTimer=setInterval(async()=>{
+    if(!currentOffice)return;
+    try{
+      const data=await fetchOfficeData(currentOffice.key);
+      // 他の人がカウントした分をマージ（自分のカウントは上書きしない）
+      let updated=false;
+      (data.items||[]).forEach(it=>{
+        const g=allItems.findIndex(a=>a.name===it.name&&a.status===it.status);
+        if(g<0)return;
+        // GitHubのデータに実在庫が入っていて、自分がまだカウントしていない場合のみ反映
+        if(it.real!==null&&it.real!==undefined&&counts[g]===undefined){
+          counts[g]=it.real;
+          if(it.memo)notes[g]=it.memo;
+          updated=true;
+        }
+      });
+      if(updated){
+        saveP();
+        // 一覧画面を再描画
+        const listEl=document.querySelector('.list-row');
+        if(listEl)renderList();
+        sss('🔄 他の担当者のカウントを取得しました','ok');
+        setTimeout(()=>sss('✓ リアルタイム同期中','ok'),3000);
+      }
+    }catch(e){}
+  },30000); // 30秒ごと
+  sss('✓ リアルタイム同期中','ok');
+}
+function stopSync(){
+  if(syncTimer){clearInterval(syncTimer);syncTimer=null;}
+}
 
 // GitHubからデータ取得
 async function fetchOfficeData(officeKey){
@@ -274,7 +330,13 @@ function renderOfficeSelect(){
     const offName=OFFICES.find(o=>o.key===saved.office)?.name||saved.office||'';
     resumeHtml=`<div class="resume-box"><div class="resume-title">途中保存データがあります</div><div class="resume-sub">${offName} / ${saved.date||''} / ${dc}件カウント済み</div><div class="resume-btns"><button class="rbtn-yes" id="ryes">続きから再開</button><button class="rbtn-no" id="rno">新しく始める</button></div></div>`;
   }
-  const offBtns=OFFICES.map(o=>`<button class="office-btn ${o.cls}" data-key="${o.key}"><span class="office-icon">${o.icon}</span><span class="office-name">${o.name}</span></button>`).join('');
+  const offBtns=OFFICES.map(o=>{
+    const saved=loadOfficeData2(o.key);
+    const dc=saved?Object.keys(saved.counts||{}).length:0;
+    const total=saved?.allItems?.length||0;
+    const badge=dc>0?`<span style="font-size:10px;color:var(--green);margin-top:2px;">✓ ${dc}/${total}件済み</span>`:'';
+    return`<button class="office-btn ${o.cls}" data-key="${o.key}"><span class="office-icon">${o.icon}</span><span class="office-name">${o.name}</span>${badge}</button>`;
+  }).join('');
   document.getElementById('app').innerHTML=`
     ${resumeHtml}
     <div class="card">
@@ -289,7 +351,20 @@ function renderOfficeSelect(){
   document.querySelectorAll('.office-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
       currentOffice=OFFICES.find(o=>o.key===btn.dataset.key);
-      sob(currentOffice.name);loadOfficeData();
+      sob(currentOffice.name);
+      // 保存済みデータがあれば読み込む
+      const saved=loadOfficeData2(currentOffice.key);
+      if(saved?.allItems?.length>0){
+        currentDate=saved.date||'';sdb(currentDate);
+        allItems=saved.allItems;counts=saved.counts||{};notes=saved.notes||{};
+        const def=CAT_DEFS.find(c=>c.key===saved.catKey);
+        if(def){currentCatDef=def;currentCatItems=allItems.filter(it=>it.cat===def.label&&it.status===def.status);}
+        startSync();
+        renderCatSelect();
+        toast(`✓ ${currentOffice.name}の保存データを読み込みました`);
+      } else {
+        loadOfficeDataFromGitHub();
+      }
     });
   });
 }
@@ -304,7 +379,7 @@ function resumeFromSave(saved){
 }
 
 // ===== GitHubからデータ読み込み =====
-async function loadOfficeData(){
+async function loadOfficeDataFromGitHub(){
   hs(`${currentOffice.name} — データ読み込み中...`);
   document.getElementById('app').innerHTML=`
     <div class="card">
@@ -319,6 +394,7 @@ async function loadOfficeData(){
     currentDate=data.date||'';sdb(currentDate);
     allItems=data.items||[];counts={};notes={};
     clearSave();
+    startSync();
     renderCatSelect();
     toast(`✓ ${currentOffice.name}（${currentDate}）のデータを読み込みました`);
   }catch(err){
@@ -340,22 +416,42 @@ function renderCatSelect(){
   const bts=CAT_DEFS.map(def=>{
     const{total,done}=cdm[def.key];if(total===0)return'';
     const dh=done>0?`<span class="cat-done">✓ ${done}/${total}件済み</span>`:`<span class="cat-count">${total}件</span>`;
-    return`<button class="cat-btn ${def.cc}" data-key="${def.key}"><span>${def.label}</span><span class="csb">${def.status}</span>${dh}</button>`;
+    const hasCounts=done>0;
+    return`<div style="position:relative;">
+      <button class="cat-btn ${def.cc}" data-key="${def.key}"><span>${def.label}</span><span class="csb">${def.status}</span>${dh}</button>
+      ${hasCounts?`<button class="cat-clear-btn" data-key="${def.key}" title="このカテゴリをクリア">🗑</button>`:''}
+    </div>`;
   }).join('');
   document.getElementById('app').innerHTML=`
-    <div class="card"><h2>${currentOffice.name} 担当を選択</h2><p class="sub">${currentDate}　自分の担当カテゴリを選んでください</p><div class="cat-grid">${bts}</div></div>
+    <div class="card">
+      <h2>${currentOffice.name} 担当を選択</h2>
+      <p class="sub">${currentDate}　自分の担当カテゴリを選んでください</p>
+      <div class="cat-grid">${bts}</div>
+    </div>
     <button class="btn btn-ghost" id="bkoff">← 営業所選択に戻る</button>
-    <button class="btn btn-ghost" id="reload">🔄 データを再読み込み</button>
-    <button class="btn btn-ghost" id="clrs">やり直す</button>`;
+    <button class="btn btn-ghost" id="reload">🔄 GitHubから再読み込み</button>`;
   document.querySelectorAll('.cat-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
       const def=CAT_DEFS.find(d=>d.key===btn.dataset.key);
       currentCatDef=def;currentCatItems=allItems.filter(it=>it.cat===def.label&&it.status===def.status);renderList();
     });
   });
-  document.getElementById('bkoff').addEventListener('click',renderOfficeSelect);
-  document.getElementById('reload').addEventListener('click',loadOfficeData);
-  document.getElementById('clrs').addEventListener('click',()=>{clearSave();counts={};notes={};renderCatSelect();});
+  // カテゴリ個別クリアボタン
+  document.querySelectorAll('.cat-clear-btn').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      const def=CAT_DEFS.find(d=>d.key===btn.dataset.key);
+      if(!confirm(`「${def.label}（${def.status}）」のカウントをクリアしますか？`))return;
+      // そのカテゴリの商品だけカウントを削除
+      const its=allItems.filter(it=>it.cat===def.label&&it.status===def.status);
+      its.forEach(it=>{const g=allItems.indexOf(it);delete counts[g];delete notes[g];});
+      saveOfficeData(currentOffice.key,{office:currentOffice.key,date:currentDate,allItems,counts,notes,catKey:currentCatDef?.key,savedAt:new Date().toISOString()});
+      toast(`🗑 ${def.label}（${def.status}）をクリアしました`);
+      renderCatSelect();
+    });
+  });
+  document.getElementById('bkoff').addEventListener('click',()=>{stopSync();renderOfficeSelect();});
+  document.getElementById('reload').addEventListener('click',loadOfficeDataFromGitHub);
 }
 
 // ===== 画面3：商品一覧（引き表示） =====
