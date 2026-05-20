@@ -461,7 +461,7 @@ function renderCatSelect(){
 }
 
 // ===== 画面3：商品一覧（引き表示） =====
-function renderList(){
+function renderList(scrollToIdx=null){
   const def=currentCatDef;const items=currentCatItems;
   const tl=`${def.label}（${def.status}）`;
   const done=items.filter(it=>counts[allItems.indexOf(it)]!==undefined).length;
@@ -497,6 +497,14 @@ function renderList(){
       renderCountScreen(i);
     });
   });
+
+  // カウントした商品の位置にスクロール
+  if(scrollToIdx!==null){
+    setTimeout(()=>{
+      const target=document.querySelector(`[data-idx="${scrollToIdx}"]`);
+      if(target)target.scrollIntoView({behavior:'smooth',block:'center'});
+    },100);
+  }
 
   document.getElementById('bb-back').onclick=renderCatSelect;
   document.getElementById('bb-save').onclick=()=>{saveP();syncToGAS(currentCatItems);};
@@ -567,7 +575,7 @@ function renderCountScreen(idx){
     saveP();syncToGAS([it]);
     // 答え合わせ後に次の商品へ自動移動（最後の商品は一覧へ）
     if(idx<items.length-1){renderCountScreen(idx+1);}
-    else{renderList();}
+    else{renderList(idx);}
   });
 
   document.getElementById('cn-prev')?.addEventListener('click',()=>{if(idx>0)renderCountScreen(idx-1);});
