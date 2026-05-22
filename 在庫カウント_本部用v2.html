@@ -262,10 +262,15 @@ function render(){
 
     <div class="card">
       <h2>③ 商品の並び順を設定</h2>
-      <p class="sub">営業所ごとに商品の並び順をドラッグ＆ドロップで変更できます。変更後は「④ GitHubにアップロード」を押すと現場に反映されます。</p>
+      <p class="sub">営業所ごとに並び順を設定できます。「並び順を固定」を押すと確定します。修正したい場合は「並び順を変更」を押してください。</p>
       <div class="sort-wrap">
         <div class="sort-office-tabs" id="sort-tabs">
           ${Object.keys(stockByOffice).map((o,i)=>`<button class="sort-tab${i===0?' active':''}" data-office="${o}">${o}</button>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:1rem;" id="sort-btn-wrap">
+          <button class="btn btn-primary" id="sort-fix-btn" style="padding:9px 20px;font-size:13px;">🔒 並び順を固定</button>
+          <button class="btn btn-ghost" id="sort-edit-btn" style="padding:9px 20px;font-size:13px;display:none;">✏️ 並び順を変更</button>
+          <div id="sort-status" style="font-size:13px;color:var(--text3);display:flex;align-items:center;"></div>
         </div>
         <div class="sort-list" id="sort-list"></div>
       </div>
@@ -294,12 +299,16 @@ function render(){
   // イベント
   document.getElementById('del-m')?.addEventListener('click',()=>{if(confirm('保存済みマスターを削除しますか？')){localStorage.removeItem(MASTER_KEY);masterLoaded=false;masterMap={};// ===== 並び替え機能 =====
 const ORDER_KEY='honbu_order';
-let officeOrders={}; // {office: [itemKey, ...]}
+const FIXED_KEY='honbu_order_fixed';
+let officeOrders={};
+let officeFixed={}; // {office: true/false} 固定状態
 let currentSortOffice=null;
 let dragSrcIdx=null;
 
 function saveOrders(){try{localStorage.setItem(ORDER_KEY,JSON.stringify(officeOrders));}catch(e){}}
 function loadOrders(){try{const s=localStorage.getItem(ORDER_KEY);return s?JSON.parse(s):{};}catch(e){return {};}}
+function saveFixed(){try{localStorage.setItem(FIXED_KEY,JSON.stringify(officeFixed));}catch(e){}}
+function loadFixed(){try{const s=localStorage.getItem(FIXED_KEY);return s?JSON.parse(s):{};}catch(e){return {};}}
 
 function getOrderedItems(office){
   const officeItems=stockByOffice[office];if(!officeItems)return[];
@@ -308,26 +317,43 @@ function getOrderedItems(office){
     if(m&&m.excluded)return null;
     return{hinban:m?m.hinban:'—',name:it.name,status:it.status,cat:m?m.cat||'未分類':'未分類',core:it.core,key:ik(it.name,it.status)};
   }).filter(Boolean);
-
   const order=officeOrders[office];
   if(!order||!order.length)return items;
-
-  // 保存された順番で並び替え
   const ordered=[];
   order.forEach(k=>{const it=items.find(i=>i.key===k);if(it)ordered.push(it);});
-  // 順番に含まれていない新規商品を末尾に追加
   items.forEach(it=>{if(!order.includes(it.key))ordered.push(it);});
   return ordered;
 }
 
+function updateSortButtons(office){
+  const fixed=officeFixed[office];
+  const fixBtn=document.getElementById('sort-fix-btn');
+  const editBtn=document.getElementById('sort-edit-btn');
+  const status=document.getElementById('sort-status');
+  if(!fixBtn)return;
+  if(fixed){
+    fixBtn.style.display='none';
+    editBtn.style.display='inline-block';
+    status.textContent='🔒 固定済み';
+    status.style.color='var(--green)';
+  } else {
+    fixBtn.style.display='inline-block';
+    editBtn.style.display='none';
+    status.textContent='✏️ 編集中（ドラッグで並び替え可能）';
+    status.style.color='var(--amber)';
+  }
+}
+
 function renderSortList(office){
   currentSortOffice=office;
+  const fixed=officeFixed[office];
   const items=getOrderedItems(office);
   const list=document.getElementById('sort-list');
   if(!list)return;
+
   list.innerHTML=items.map((it,i)=>`
-    <div class="sort-item" draggable="true" data-idx="${i}" data-key="${it.key}">
-      <div class="sort-handle">⠿</div>
+    <div class="sort-item" ${!fixed?'draggable="true"':''} data-idx="${i}" data-key="${it.key}" style="${fixed?'cursor:default;opacity:.85;':''}">
+      <div class="sort-handle" style="${fixed?'opacity:.3;':''}">${fixed?'🔒':'⠿'}</div>
       <div class="sort-num">${i+1}</div>
       <div class="sort-name">
         <div class="sort-item-name">${it.name}</div>
@@ -335,6 +361,10 @@ function renderSortList(office){
       </div>
       <div class="sort-cat">${it.cat}</div>
     </div>`).join('');
+
+  updateSortButtons(office);
+
+  if(fixed)return; // 固定中はドラッグ無効
 
   // ドラッグ＆ドロップイベント
   list.querySelectorAll('.sort-item').forEach(item=>{
@@ -357,21 +387,19 @@ function renderSortList(office){
       e.preventDefault();
       const targetIdx=parseInt(item.dataset.idx);
       if(dragSrcIdx===targetIdx)return;
-      // 並び順を更新
-      const items=getOrderedItems(currentSortOffice);
-      const moved=items.splice(dragSrcIdx,1)[0];
-      items.splice(targetIdx,0,moved);
-      officeOrders[currentSortOffice]=items.map(i=>i.key);
+      const its=getOrderedItems(currentSortOffice);
+      const moved=its.splice(dragSrcIdx,1)[0];
+      its.splice(targetIdx,0,moved);
+      officeOrders[currentSortOffice]=its.map(i=>i.key);
       saveOrders();
       renderSortList(currentSortOffice);
-      // 番号を更新
-      toast(`✓ ${currentSortOffice}の並び順を保存しました`);
     });
   });
 }
 
 function initSortTabs(){
   officeOrders=loadOrders();
+  officeFixed=loadFixed();
   const tabs=document.querySelectorAll('.sort-tab');
   if(!tabs.length)return;
   const firstOffice=tabs[0]?.dataset.office;
@@ -382,6 +410,27 @@ function initSortTabs(){
       tab.classList.add('active');
       renderSortList(tab.dataset.office);
     });
+  });
+
+  // 固定ボタン
+  document.getElementById('sort-fix-btn')?.addEventListener('click',()=>{
+    if(!currentSortOffice)return;
+    // 現在の並び順を保存して固定
+    const items=getOrderedItems(currentSortOffice);
+    officeOrders[currentSortOffice]=items.map(i=>i.key);
+    officeFixed[currentSortOffice]=true;
+    saveOrders();saveFixed();
+    renderSortList(currentSortOffice);
+    toast(`🔒 ${currentSortOffice}の並び順を固定しました`);
+  });
+
+  // 変更ボタン
+  document.getElementById('sort-edit-btn')?.addEventListener('click',()=>{
+    if(!currentSortOffice)return;
+    officeFixed[currentSortOffice]=false;
+    saveFixed();
+    renderSortList(currentSortOffice);
+    toast(`✏️ ${currentSortOffice}の並び順を編集できます`);
   });
 }
 
