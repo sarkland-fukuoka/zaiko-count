@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>在庫カウント 本部用</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#F2F0EB;--surface:#FFFFFF;--border:#E2DED8;--border2:#C8C4BC;
+  --text:#1A1A18;--text2:#6B6962;--text3:#A8A49E;
+  --green:#1D9E75;--green-bg:#EAF3DE;--green-text:#3B6D11;
+  --blue:#185FA5;--blue-bg:#E6F1FB;--blue-text:#0C447C;
+  --red:#A32D2D;--red-bg:#FCEBEB;--red-text:#791F1F;
+  --amber:#854F0B;--amber-bg:#FAEEDA;--amber-text:#633806;
+  --radius:12px;--radius-sm:8px;
+}
+body{font-family:'Hiragino Sans','Yu Gothic',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+.header{background:var(--text);color:#fff;padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;}
+.header-title{font-size:18px;font-weight:700;}
+.header-sub{font-size:12px;opacity:.6;margin-top:2px;}
+.hbadge{background:#fff2;padding:3px 10px;border-radius:var(--radius-sm);font-size:11px;font-weight:600;}
+.wrap{max-width:900px;margin:0 auto;padding:2rem;}
+.card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.5rem;margin-bottom:1.5rem;}
+h2{font-size:18px;font-weight:700;margin-bottom:6px;}
+.sub{font-size:13px;color:var(--text2);margin-bottom:1.25rem;line-height:1.6;}
+.file-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;}
+.file-block{border:1.5px dashed var(--border2);border-radius:var(--radius-sm);padding:1.25rem;text-align:center;cursor:pointer;background:var(--bg);transition:all .2s;}
+.file-block:hover{border-color:var(--blue);background:var(--blue-bg);}
+.file-block.loaded{border-style:solid;border-color:var(--green);background:var(--green-bg);}
+.fb-icon{font-size:28px;margin-bottom:6px;}
+.fb-title{font-size:14px;font-weight:600;}
+.fb-hint{font-size:11px;color:var(--text3);margin-top:4px;}
+.fb-ok{font-size:12px;color:var(--green-text);margin-top:6px;font-weight:600;}
+input[type=file]{display:none;}
+input[type=text],input[type=password]{width:100%;padding:10px 12px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:monospace;margin-top:6px;}
+input[type=text]:focus,input[type=password]:focus{outline:none;border-color:var(--blue);}
+.btn{padding:12px 24px;border-radius:var(--radius-sm);border:none;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .2s;}
+.btn:hover{opacity:.85;}
+.btn-primary{background:var(--text);color:#fff;}
+.btn-green{background:var(--green);color:#fff;}
+.btn-ghost{background:transparent;color:var(--text2);border:0.5px solid var(--border2);}
+.btn.w100{width:100%;display:block;text-align:center;margin-top:.75rem;padding:14px;}
+.err{background:var(--red-bg);color:var(--red-text);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:13px;margin-top:.5rem;}
+.ok-box{background:var(--green-bg);border:0.5px solid var(--green);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:13px;color:var(--green-text);margin-top:.5rem;}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:1rem 0;}
+.stat-box{background:var(--bg);border-radius:var(--radius-sm);padding:1rem;text-align:center;}
+.stat-val{font-size:26px;font-weight:700;}
+.stat-label{font-size:11px;color:var(--text3);margin-top:4px;}
+.office-list{display:flex;flex-direction:column;gap:8px;margin-top:1rem;}
+.office-row{display:flex;align-items:center;justify-content:space-between;background:var(--bg);border-radius:var(--radius-sm);padding:12px 16px;}
+.office-name{font-size:14px;font-weight:600;}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;margin-right:4px;background:var(--blue-bg);color:var(--blue-text);}
+.new-badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:var(--amber-bg);color:var(--amber-text);margin-left:6px;}
+.new-item-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:0.5px solid var(--border);}
+.new-item-row:last-child{border-bottom:none;}
+.ni-name{font-size:14px;font-weight:600;}
+.ni-meta{font-size:11px;color:var(--text3);margin-top:2px;}
+.asel{font-size:13px;padding:6px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);}
+.master-box{background:var(--blue-bg);border:0.5px solid var(--blue);border-radius:var(--radius);padding:1rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;}
+.master-info h3{font-size:14px;font-weight:600;color:var(--blue-text);margin-bottom:2px;}
+.master-info p{font-size:12px;color:var(--blue);}
+.master-btns{display:flex;gap:8px;flex-shrink:0;}
+.mb{padding:7px 14px;border-radius:var(--radius-sm);border:none;font-size:12px;font-weight:600;cursor:pointer;}
+.mb-del{background:transparent;border:0.5px solid var(--red)!important;color:var(--red-text);}
+.upload-progress{background:var(--green-bg);border:0.5px solid var(--green);border-radius:var(--radius-sm);padding:1rem;margin-top:.75rem;}
+.up-title{font-size:14px;font-weight:600;color:var(--green-text);margin-bottom:.5rem;}
+.up-bar-out{height:6px;background:#fff;border-radius:3px;overflow:hidden;}
+.up-bar-in{height:6px;background:var(--green);border-radius:3px;transition:width .3s;}
+.up-status{font-size:12px;color:var(--green);margin-top:6px;}
+/* 並び替え */
+.sort-wrap{margin-top:1rem;}
+.sort-office-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;}
+.sort-tab{padding:7px 16px;border-radius:var(--radius-sm);border:0.5px solid var(--border2);background:var(--bg);font-size:13px;font-weight:600;cursor:pointer;color:var(--text2);}
+.sort-tab.active{background:var(--text);color:#fff;border-color:var(--text);}
+.sort-list{display:flex;flex-direction:column;gap:4px;min-height:200px;}
+.sort-item{display:flex;align-items:center;gap:10px;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;cursor:grab;user-select:none;transition:box-shadow .15s;}
+.sort-item:active{cursor:grabbing;}
+.sort-item.dragging{opacity:.5;box-shadow:0 4px 16px rgba(0,0,0,.15);}
+.sort-item.drag-over{border-color:var(--blue);background:var(--blue-bg);}
+.sort-handle{font-size:18px;color:var(--text3);flex-shrink:0;}
+.sort-num{font-size:12px;color:var(--text3);width:24px;text-align:right;flex-shrink:0;}
+.sort-name{flex:1;min-width:0;}
+.sort-item-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sort-item-meta{font-size:11px;color:var(--text3);margin-top:1px;}
+.sort-cat{font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;background:var(--blue-bg);color:var(--blue-text);flex-shrink:0;}
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:12px 24px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;z-index:999;animation:fadeInOut 2.5s ease forwards;white-space:nowrap;}
+@keyframes fadeInOut{0%{opacity:0;transform:translateX(-50%) translateY(10px)}15%{opacity:1;transform:translateX(-50%) translateY(0)}75%{opacity:1}100%{opacity:0}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <div class="header-title">在庫カウント 本部用</div>
+    <div class="header-sub">在庫CSVを読み込んで各営業所へデータを配布します</div>
+  </div>
+  <div class="hbadge">🖥 本部PC専用</div>
+</div>
+<div class="wrap" id="app"></div>
+
+<script>
+const GITHUB_USER='kawasakifamilia1121-byte';
+const GITHUB_REPO='zaiko-count';
+const GITHUB_BRANCH='main';
+const MASTER_KEY='honbu_master_v2';
+const TOKEN_KEY='honbu_github_token';
+const GAS_URL_KEY='honbu_gas_url';
+const CAT_OPTIONS=['家電','家具','布団・カーテン'];
+const OFFICES=['福岡1','福岡2','広島1','広島2','四国','南九州'];
+const OFFICE_MAP={'福岡':'福岡1','福岡1':'福岡1','福岡2':'福岡2','広島':'広島1','広島1':'広島1','広島2':'広島2','四国':'四国','南九州':'南九州'};
+
+function catFromS(s){if(!s)return null;if(s==='家電')return'家電';if(s==='家具')return'家具';if(s.includes('布団')||s.includes('カーテン'))return'布団・カーテン';return null;}
+function ik(n,s){return(n+'__'+(s||'')).trim();}
+function rf(f,cb){const r=new FileReader();r.onload=e=>cb(e.target.result);r.readAsText(f,'Shift-JIS');}
+function scsv(text){const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l);if(!lines.length)return null;const d=lines[0].includes('\t')?'\t':',';return lines.map(l=>l.split(d).map(c=>c.trim()));}
+function saveMaster(m){try{localStorage.setItem(MASTER_KEY,JSON.stringify(m));}catch(e){}}
+function loadMaster(){try{const s=localStorage.getItem(MASTER_KEY);return s?JSON.parse(s):null;}catch(e){return null;}}
+function saveToken(t){try{localStorage.setItem(TOKEN_KEY,t);}catch(e){}}
+function loadToken(){try{return localStorage.getItem(TOKEN_KEY)||'';}catch(e){return '';}}
+function saveGasUrl(u){try{localStorage.setItem(GAS_URL_KEY,u);}catch(e){}}
+function loadGasUrl(){try{return localStorage.getItem(GAS_URL_KEY)||'';}catch(e){return '';}}
+function toast(msg){const o=document.querySelector('.toast');if(o)o.remove();const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>{if(t.parentNode)t.remove();},2700);}
+
+function parseMaster(text){
+  const rows=scsv(text);if(!rows||rows.length<2)return{map:null,err:'データが空です'};
+  const h=rows[0];const ci=n=>h.findIndex(x=>x===n||x.includes(n));
+  const cN=ci('商品名'),cS=ci('商品状態'),cSh=ci('種別');
+  if(cN<0)return{map:null,err:'「商品名」列が見つかりません'};
+  const map={};
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i];if(!r||r.length<3)continue;
+    const c0=(r[0]||'').trim();
+    if(['倉庫','品番',...OFFICES].includes(c0))continue;
+    const hb=c0,name=(r[cN]||'').trim();
+    const st=cS>=0?(r[cS]||'').trim():'';
+    const sh=cSh>=0?(r[cSh]||'').trim():'';
+    const cat=catFromS(sh);if(!name)continue;
+    const k=ik(name,st);
+    if(!map[k]||(!map[k].cat&&cat))map[k]={hinban:hb,name,status:st,cat,excluded:cat===null};
+  }
+  if(!Object.keys(map).length)return{map:null,err:'有効なデータが見つかりませんでした'};
+  return{map,err:null};
+}
+
+function parseStock(text){
+  const rows=scsv(text);if(!rows||rows.length<2)return{byOffice:null,err:'データが空です'};
+  const h=rows[0];
+  const ci=n=>h.findIndex(x=>x===n||x.includes(n));
+  let cN=ci('商品名');if(cN<0&&h.length>1)cN=1;
+  if(cN<0)return{byOffice:null,err:'「商品名」列が見つかりません'};
+  const cS=ci('商品状態'),cSh=ci('種別'),cO=0;
+  let cC=4;for(let i=4;i<h.length;i++){if(/\d+[\/\(]/.test(h[i])||/^\d{1,2}\/\d{1,2}/.test(h[i])){cC=i;break;}}
+  const byOffice={};
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i];if(!r||r.length<=cC)continue;
+    const sh=cSh>=0?(r[cSh]||'').trim():'';if(sh!=='在庫')continue;
+    const rawOffice=(r[cO]||'').trim();
+    const office=OFFICE_MAP[rawOffice]||rawOffice;
+    const name=(r[cN]||'').trim();const st=cS>=0?(r[cS]||'').trim():'';
+    const core=parseInt(r[cC]||'0')||0;if(!name||!office)continue;
+    if(!byOffice[office])byOffice[office]={};
+    const k=ik(name,st);
+    if(!byOffice[office][k])byOffice[office][k]={name,status:st,core,office};
+    else byOffice[office][k].core+=core;
+  }
+  if(!Object.keys(byOffice).length)return{byOffice:null,err:'種別「在庫」の行が見つかりませんでした'};
+  return{byOffice,err:null};
+}
+
+// GitHubにファイルをアップロード
+async function uploadToGitHub(path,content,token,onProgress){
+  const url=`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${path}`;
+  // 既存ファイルのSHAを取得
+  let sha=null;
+  try{
+    const r=await fetch(url,{headers:{'Authorization':`token ${token}`,'Accept':'application/vnd.github.v3+json'}});
+    if(r.ok){const d=await r.json();sha=d.sha;}
+  }catch(e){}
+  const body={message:`Update ${path}`,content:btoa(unescape(encodeURIComponent(content))),branch:GITHUB_BRANCH};
+  if(sha)body.sha=sha;
+  const res=await fetch(url,{method:'PUT',headers:{'Authorization':`token ${token}`,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!res.ok)throw new Error(`GitHubアップロード失敗: ${res.status}`);
+  if(onProgress)onProgress();
+}
+
+let masterMap={},stockByOffice={},masterLoaded=false,stockLoaded=false,newItems=[],stockFileNames=[];
+
+function mergeStock(byOffice){
+  Object.entries(byOffice).forEach(([office,items])=>{
+    if(!stockByOffice[office])stockByOffice[office]={};
+    Object.entries(items).forEach(([k,it])=>{
+      if(!stockByOffice[office][k])stockByOffice[office][k]=it;
+      else stockByOffice[office][k].core+=it.core;
+    });
+  });
+}
+function extractNewItems(){
+  const nmap={};
+  Object.values(stockByOffice).forEach(offItems=>{
+    Object.values(offItems).forEach(it=>{
+      const k=ik(it.name,it.status);
+      if(!masterMap[k]){if(!nmap[k])nmap[k]={name:it.name,status:it.status,totalCore:0};nmap[k].totalCore+=it.core;}
+    });
+  });
+  newItems=Object.values(nmap);
+}
+
+function render(){
+  const savedMaster=loadMaster();
+  if(savedMaster&&!masterLoaded){masterMap=savedMaster;masterLoaded=true;}
+  const token=loadToken();
+  const gasUrl=loadGasUrl();
+  const today=new Date();
+  const dateStr=`${today.getFullYear()}年${today.getMonth()+1}月${today.getDate()}日`;
+
+  const masterSection=savedMaster
+    ?`<div class="master-box"><div class="master-info"><h3>📋 保存済みマスター（${Object.keys(savedMaster).length}件）</h3><p>新しいマスターCSVを読み込む場合は下のエリアをクリック</p></div><div class="master-btns"><button class="mb mb-del" id="del-m">🗑 削除</button></div></div>`:'';
+
+  document.getElementById('app').innerHTML=`
+    <div class="card">
+      <h2>① マスター・在庫CSVを読み込む</h2>
+      <p class="sub">マスターCSVで商品カテゴリを管理します。在庫CSVは毎月最新のものを読み込んでください。</p>
+      ${masterSection}
+      <div class="file-grid">
+        <label class="file-block${masterLoaded?' loaded':''}" for="fm">
+          <div class="fb-icon">📋</div>
+          <div class="fb-title">マスターCSV</div>
+          <div class="fb-hint">品番・カテゴリ情報</div>
+          <div class="fb-ok" style="display:${masterLoaded?'block':'none'};">✓ ${Object.keys(masterMap).length}件読み込み済み</div>
+        </label>
+        <input type="file" id="fm" accept=".csv,.txt">
+        <label class="file-block${stockLoaded?' loaded':''}" for="fs">
+          <div class="fb-icon">📊</div>
+          <div class="fb-title">在庫CSV（複数選択OK）</div>
+          <div class="fb-hint">営業所ごとのCSVをまとめて選択</div>
+          <div class="fb-ok" style="display:${stockLoaded?'block':'none'};">✓ ${stockFileNames.length}ファイル / ${Object.keys(stockByOffice).length}営業所</div>
+        </label>
+        <input type="file" id="fs" accept=".csv,.txt" multiple>
+      </div>
+      <div id="emsg"></div>
+    </div>
+
+    ${stockLoaded?`
+    <div class="card">
+      <h2>② 新規商品のカテゴリ設定</h2>
+      ${newItems.length>0
+        ?`<p class="sub">マスターにない新規商品が <strong>${newItems.length}件</strong> あります。</p>
+          ${newItems.map(it=>`<div class="new-item-row"><div><div class="ni-name">${it.name}<span class="new-badge">新規</span></div><div class="ni-meta">${it.status||''}　コア在庫: ${it.totalCore}</div></div><select class="asel" data-key="${ik(it.name,it.status)}" data-name="${it.name}" data-status="${it.status||''}">${CAT_OPTIONS.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div>`).join('')}
+          <button class="btn btn-primary w100" id="save-new">✅ カテゴリを確定してマスターに保存</button>`
+        :`<div class="ok-box">✓ 新規商品はありません。すべてマスターに登録済みです。</div>`}
+    </div>
+
+    <div class="card">
+      <h2>③ 各種設定</h2>
+      <p class="sub">一度設定すれば保存されます。</p>
+      <p style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:4px;">GitHubトークン</p>
+      <input type="password" id="token-input" placeholder="ghp_xxxxxxxxxxxxxxxx" value="${token}">
+      <p style="font-size:13px;font-weight:600;color:var(--text2);margin-top:12px;margin-bottom:4px;">GAS URL（スプレッドシート連携）</p>
+      <input type="text" id="gas-url-input" placeholder="https://script.google.com/macros/s/..." value="${gasUrl}">
+      <div id="token-msg"></div>
+    </div>
+
+    <div class="card">
+      <h2>③ 商品の並び順を設定</h2>
+      <p class="sub">営業所ごとに並び順を設定できます。「並び順を固定」を押すと確定します。修正したい場合は「並び順を変更」を押してください。</p>
+      <div class="sort-wrap">
+        <div class="sort-office-tabs" id="sort-tabs">
+          ${Object.keys(stockByOffice).map((o,i)=>`<button class="sort-tab${i===0?' active':''}" data-office="${o}">${o}</button>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:1rem;" id="sort-btn-wrap">
+          <button class="btn btn-primary" id="sort-fix-btn" style="padding:9px 20px;font-size:13px;">🔒 並び順を固定</button>
+          <button class="btn btn-ghost" id="sort-edit-btn" style="padding:9px 20px;font-size:13px;display:none;">✏️ 並び順を変更</button>
+          <div id="sort-status" style="font-size:13px;color:var(--text3);display:flex;align-items:center;"></div>
+        </div>
+        <div class="sort-list" id="sort-list"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>④ 現場にデータを配布</h2>
+      <p class="sub">${dateStr}のデータを各営業所へ配布します。「GitHubにアップロード」を押すと現場アプリが自動でデータを取得できるようになります。</p>
+      <div class="stat-grid">
+        ${Object.keys(stockByOffice).map(o=>{
+          const items=Object.values(stockByOffice[o]);
+          const cnt=items.filter(it=>{const m=masterMap[ik(it.name,it.status)];return!m||!m.excluded;}).length;
+          return`<div class="stat-box"><div class="stat-val">${cnt}</div><div class="stat-label">${o}</div></div>`;
+        }).join('')}
+      </div>
+      <div id="upload-progress" style="display:none;" class="upload-progress">
+        <div class="up-title">📤 GitHubにアップロード中...</div>
+        <div class="up-bar-out"><div class="up-bar-in" id="up-bar" style="width:0%"></div></div>
+        <div class="up-status" id="up-status">準備中...</div>
+      </div>
+      <button class="btn btn-green w100" id="upload-all">📤 GitHubにアップロード（現場へ配布）</button>
+    </div>
+    `:''}
+  `;
+
+  // イベント
+  document.getElementById('del-m')?.addEventListener('click',()=>{if(confirm('保存済みマスターを削除しますか？')){localStorage.removeItem(MASTER_KEY);masterLoaded=false;masterMap={};// ===== 並び替え機能 =====
+const ORDER_KEY='honbu_order';
+const FIXED_KEY='honbu_order_fixed';
+let officeOrders={};
+let officeFixed={}; // {office: true/false} 固定状態
+let currentSortOffice=null;
+let dragSrcIdx=null;
+
+function saveOrders(){try{localStorage.setItem(ORDER_KEY,JSON.stringify(officeOrders));}catch(e){}}
+function loadOrders(){try{const s=localStorage.getItem(ORDER_KEY);return s?JSON.parse(s):{};}catch(e){return {};}}
+function saveFixed(){try{localStorage.setItem(FIXED_KEY,JSON.stringify(officeFixed));}catch(e){}}
+function loadFixed(){try{const s=localStorage.getItem(FIXED_KEY);return s?JSON.parse(s):{};}catch(e){return {};}}
+
+function getOrderedItems(office){
+  const officeItems=stockByOffice[office];if(!officeItems)return[];
+  const items=Object.values(officeItems).map(it=>{
+    const m=masterMap[ik(it.name,it.status)];
+    if(m&&m.excluded)return null;
+    return{hinban:m?m.hinban:'—',name:it.name,status:it.status,cat:m?m.cat||'未分類':'未分類',core:it.core,key:ik(it.name,it.status)};
+  }).filter(Boolean);
+  const order=officeOrders[office];
+  if(!order||!order.length)return items;
+  const ordered=[];
+  order.forEach(k=>{const it=items.find(i=>i.key===k);if(it)ordered.push(it);});
+  items.forEach(it=>{if(!order.includes(it.key))ordered.push(it);});
+  return ordered;
+}
+
+function updateSortButtons(office){
+  const fixed=officeFixed[office];
+  const fixBtn=document.getElementById('sort-fix-btn');
+  const editBtn=document.getElementById('sort-edit-btn');
+  const status=document.getElementById('sort-status');
+  if(!fixBtn)return;
+  if(fixed){
+    fixBtn.style.display='none';
+    editBtn.style.display='inline-block';
+    status.textContent='🔒 固定済み';
+    status.style.color='var(--green)';
+  } else {
+    fixBtn.style.display='inline-block';
+    editBtn.style.display='none';
+    status.textContent='✏️ 編集中（ドラッグで並び替え可能）';
+    status.style.color='var(--amber)';
+  }
+}
+
+function renderSortList(office){
+  currentSortOffice=office;
+  const fixed=officeFixed[office];
+  const items=getOrderedItems(office);
+  const list=document.getElementById('sort-list');
+  if(!list)return;
+
+  list.innerHTML=items.map((it,i)=>`
+    <div class="sort-item" ${!fixed?'draggable="true"':''} data-idx="${i}" data-key="${it.key}" style="${fixed?'cursor:default;opacity:.85;':''}">
+      <div class="sort-handle" style="${fixed?'opacity:.3;':''}">${fixed?'🔒':'⠿'}</div>
+      <div class="sort-num">${i+1}</div>
+      <div class="sort-name">
+        <div class="sort-item-name">${it.name}</div>
+        <div class="sort-item-meta">${it.status}　品番: ${it.hinban}　コア: ${it.core}</div>
+      </div>
+      <div class="sort-cat">${it.cat}</div>
+    </div>`).join('');
+
+  updateSortButtons(office);
+
+  if(fixed)return; // 固定中はドラッグ無効
+
+  // ドラッグ＆ドロップイベント
+  list.querySelectorAll('.sort-item').forEach(item=>{
+    item.addEventListener('dragstart',e=>{
+      dragSrcIdx=parseInt(item.dataset.idx);
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move';
+    });
+    item.addEventListener('dragend',()=>{
+      item.classList.remove('dragging');
+      list.querySelectorAll('.sort-item').forEach(i=>i.classList.remove('drag-over'));
+    });
+    item.addEventListener('dragover',e=>{
+      e.preventDefault();
+      e.dataTransfer.dropEffect='move';
+      list.querySelectorAll('.sort-item').forEach(i=>i.classList.remove('drag-over'));
+      item.classList.add('drag-over');
+    });
+    item.addEventListener('drop',e=>{
+      e.preventDefault();
+      const targetIdx=parseInt(item.dataset.idx);
+      if(dragSrcIdx===targetIdx)return;
+      const its=getOrderedItems(currentSortOffice);
+      const moved=its.splice(dragSrcIdx,1)[0];
+      its.splice(targetIdx,0,moved);
+      officeOrders[currentSortOffice]=its.map(i=>i.key);
+      saveOrders();
+      renderSortList(currentSortOffice);
+    });
+  });
+}
+
+function initSortTabs(){
+  officeOrders=loadOrders();
+  officeFixed=loadFixed();
+  const tabs=document.querySelectorAll('.sort-tab');
+  if(!tabs.length)return;
+  const firstOffice=tabs[0]?.dataset.office;
+  if(firstOffice)renderSortList(firstOffice);
+  tabs.forEach(tab=>{
+    tab.addEventListener('click',()=>{
+      tabs.forEach(t=>t.classList.remove('active'));
+      tab.classList.add('active');
+      renderSortList(tab.dataset.office);
+    });
+  });
+
+  // 固定ボタン
+  document.getElementById('sort-fix-btn')?.addEventListener('click',()=>{
+    if(!currentSortOffice)return;
+    // 現在の並び順を保存して固定
+    const items=getOrderedItems(currentSortOffice);
+    officeOrders[currentSortOffice]=items.map(i=>i.key);
+    officeFixed[currentSortOffice]=true;
+    saveOrders();saveFixed();
+    renderSortList(currentSortOffice);
+    toast(`🔒 ${currentSortOffice}の並び順を固定しました`);
+  });
+
+  // 変更ボタン
+  document.getElementById('sort-edit-btn')?.addEventListener('click',()=>{
+    if(!currentSortOffice)return;
+    officeFixed[currentSortOffice]=false;
+    saveFixed();
+    renderSortList(currentSortOffice);
+    toast(`✏️ ${currentSortOffice}の並び順を編集できます`);
+  });
+}
+
+render();
+// 並び替えタブを初期化
+if(stockLoaded)setTimeout(initSortTabs,100);}});
+
+  document.getElementById('fm').addEventListener('change',e=>{
+    const f=e.target.files[0];if(!f)return;
+    rf(f,text=>{
+      const{map,err}=parseMaster(text);
+      if(err||!map){document.getElementById('emsg').innerHTML=`<div class="err">${err}</div>`;}
+      else{masterMap=map;masterLoaded=true;saveMaster(map);render();setTimeout(initSortTabs,100);toast(`✓ マスター ${Object.keys(map).length}件 を読み込みました`);}
+    });
+  });
+
+  document.getElementById('fs').addEventListener('change',e=>{
+    const files=[...e.target.files];if(!files.length)return;
+    let loaded=0;
+    files.forEach(f=>{
+      if(stockFileNames.includes(f.name)){loaded++;if(loaded===files.length){extractNewItems();render();}return;}
+      rf(f,text=>{
+        const{byOffice,err}=parseStock(text);
+        if(err||!byOffice){document.getElementById('emsg').innerHTML=`<div class="err">${f.name}：${err}</div>`;}
+        else{mergeStock(byOffice);stockFileNames.push(f.name);stockLoaded=true;}
+        loaded++;
+        if(loaded===files.length){extractNewItems();render();setTimeout(initSortTabs,100);toast(`✓ ${stockFileNames.length}ファイル読み込み完了（${Object.keys(stockByOffice).length}営業所）`);}
+      });
+    });
+    e.target.value='';
+  });
+
+  document.getElementById('save-new')?.addEventListener('click',()=>{
+    document.querySelectorAll('.asel').forEach(s=>{
+      masterMap[s.dataset.key]={hinban:'—',name:s.dataset.name,status:s.dataset.status,cat:s.value,excluded:false};
+    });
+    saveMaster(masterMap);newItems=[];toast('✅ マスターに保存しました');render();setTimeout(initSortTabs,100);
+  });
+
+  document.getElementById('token-input')?.addEventListener('change',e=>{saveToken(e.target.value.trim());});
+  document.getElementById('gas-url-input')?.addEventListener('change',e=>{saveGasUrl(e.target.value.trim());});
+
+  document.getElementById('upload-all')?.addEventListener('click',async()=>{
+    const token=document.getElementById('token-input').value.trim();
+    if(!token){document.getElementById('token-msg').innerHTML=`<div class="err">GitHubトークンを入力してください</div>`;return;}
+    saveToken(token);
+
+    const offices=Object.keys(stockByOffice);
+    const total=offices.length+1;
+    let done=0;
+    const updateProgress=(msg)=>{
+      done++;
+      const pct=Math.round(done/total*100);
+      document.getElementById('up-bar').style.width=pct+'%';
+      document.getElementById('up-status').textContent=msg;
+    };
+
+    document.getElementById('upload-progress').style.display='block';
+    document.getElementById('upload-all').disabled=true;
+    document.getElementById('up-status').textContent='開始中...';
+
+    try{
+      const today=new Date();
+      const dateStr=`${today.getFullYear()}年${today.getMonth()+1}月${today.getDate()}日`;
+
+      const gasUrl=loadGasUrl();
+      officeOrders=loadOrders();
+      for(const office of offices){
+        // 並び順を適用
+        const items=getOrderedItems(office);
+        // GitHubにJSONをアップロード
+        const payload=JSON.stringify({office,date:dateStr,generatedAt:new Date().toISOString(),items},null,2);
+        const fileName=`data/${office}.json`;
+        await uploadToGitHub(fileName,payload,token);
+        // GASにシート初期化を送信（マスター順でシートを作成）
+        if(gasUrl){
+          try{
+            await fetch(gasUrl,{
+              method:'POST',
+              body:JSON.stringify({action:'initSheet',office,items}),
+              headers:{'Content-Type':'text/plain'},
+              mode:'no-cors'
+            });
+          }catch(e){}
+        }
+        updateProgress(`${office} 完了`);
+      }
+
+      // マスターもアップロード
+      let masterCsv='品番,商品名,商品状態,種別\n';
+      Object.values(masterMap).forEach(v=>{if(v.name){const sh=v.excluded?'':(v.cat||'');masterCsv+=`${v.hinban||'—'},${v.name},${v.status||''},${sh}\n`;}});
+      await uploadToGitHub('master.csv',masterCsv,token);
+      updateProgress('マスター更新完了');
+
+      document.getElementById('up-status').textContent=`✅ ${offices.length}営業所のデータを配布しました！`;
+      toast('🎉 GitHubへのアップロード完了！現場アプリで自動的に反映されます');
+    }catch(err){
+      document.getElementById('up-status').textContent=`❌ エラー：${err.message}`;
+      toast('アップロードに失敗しました');
+    }
+    document.getElementById('upload-all').disabled=false;
+  });
+}
+
+render();
+</script>
+</body>
+</html>
