@@ -400,7 +400,14 @@ function renderSortList(office){
 function initSortTabs(){
   officeOrders=loadOrders();
   officeFixed=loadFixed();
-  const tabs=document.querySelectorAll('.sort-tab');
+  // sort-tabsが存在しない場合はDOMを直接更新
+  const tabsWrap=document.getElementById('sort-tabs');
+  if(!tabsWrap)return;
+  // タブを再生成（在庫データが更新されている場合に対応）
+  tabsWrap.innerHTML=Object.keys(stockByOffice).map((o,i)=>
+    `<button class="sort-tab${i===0?' active':''}" data-office="${o}">${o}</button>`
+  ).join('');
+  const tabs=tabsWrap.querySelectorAll('.sort-tab');
   if(!tabs.length)return;
   const firstOffice=tabs[0]?.dataset.office;
   if(firstOffice)renderSortList(firstOffice);
@@ -497,7 +504,9 @@ if(stockLoaded)setTimeout(initSortTabs,100);}});
       const dateStr=`${today.getFullYear()}年${today.getMonth()+1}月${today.getDate()}日`;
 
       const gasUrl=loadGasUrl();
-      officeOrders=loadOrders();
+      // 並び順を読み込み（未初期化の場合は空オブジェクト）
+      try{officeOrders=loadOrders();}catch(e){officeOrders={};}
+      try{officeFixed=loadFixed();}catch(e){officeFixed={};}
       for(const office of offices){
         // 並び順を適用
         const items=getOrderedItems(office);
