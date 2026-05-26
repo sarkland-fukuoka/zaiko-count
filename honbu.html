@@ -189,8 +189,17 @@ function splitLine(line) {
 
 function readText(file, cb) {
   var r = new FileReader();
-  r.onload = function(e) { cb(e.target.result); };
-  r.readAsText(file, 'UTF-8');
+  r.onload = function(e) {
+    var text = e.target.result;
+    if (text.indexOf('\u5009\u5eab') >= 0 || text.indexOf('\u5546\u54c1\u540d') >= 0) {
+      cb(text);
+    } else {
+      var r2 = new FileReader();
+      r2.onload = function(e2) { cb(e2.target.result); };
+      r2.readAsText(file, 'UTF-8');
+    }
+  };
+  r.readAsText(file, 'Shift_JIS');
 }
 
 // マスターCSV読み込み
