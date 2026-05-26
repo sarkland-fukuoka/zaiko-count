@@ -212,6 +212,15 @@ const CAT_DEFS=[
   {key:'布団・カーテン_新品',label:'布団・カーテン',status:'新品',cc:'futon shinpin'},
   {key:'布団・カーテン_中古',label:'布団・カーテン',status:'中古',cc:'futon chuko'},
 ];
+// 南九州用：新品・中古混在カテゴリ
+const CAT_DEFS_MIXED=[
+  {key:'家電_混在',label:'家電',status:'',cc:'denki shinpin',mixed:true},
+  {key:'家具_混在',label:'家具',status:'',cc:'kagu shinpin',mixed:true},
+  {key:'布団・カーテン_混在',label:'布団・カーテン',status:'',cc:'futon shinpin',mixed:true},
+];
+function getOfficeCatDefs(office){
+  return (office==='南九州')?CAT_DEFS_MIXED:CAT_DEFS;
+}
 
 let currentOffice=null,currentDate='',allItems=[],counts={},notes={};
 let currentCatDef=null,currentCatItems=[];
@@ -363,8 +372,9 @@ function renderOfficeSelect(){
       if(saved?.allItems?.length>0){
         currentDate=saved.date||'';sdb(currentDate);
         allItems=saved.allItems;counts=saved.counts||{};notes=saved.notes||{};
-        const def=CAT_DEFS.find(c=>c.key===saved.catKey);
-        if(def){currentCatDef=def;currentCatItems=allItems.filter(it=>it.cat===def.label&&it.status===def.status);}
+        const _cd=getOfficeCatDefs(currentOffice.key);
+        const def=_cd.find(c=>c.key===saved.catKey);
+        if(def){currentCatDef=def;currentCatItems=def.mixed?allItems.filter(it=>it.cat===def.label):allItems.filter(it=>it.cat===def.label&&it.status===def.status);}
         startSync();
         renderCatSelect();
         toast(`✓ ${currentOffice.name}の保存データを読み込みました`);
@@ -379,8 +389,9 @@ function resumeFromSave(saved){
   currentOffice=OFFICES.find(o=>o.key===saved.office)||{key:saved.office,name:saved.office};
   sob(currentOffice.name);sdb(saved.date||'');
   allItems=saved.allItems;counts=saved.counts||{};notes=saved.notes||{};currentDate=saved.date||'';
-  const def=CAT_DEFS.find(c=>c.key===saved.catKey);
-  if(def){currentCatDef=def;currentCatItems=allItems.filter(it=>it.cat===def.label&&it.status===def.status);renderList();}
+  const _catDefs=getOfficeCatDefs(currentOffice.key);
+  const def=_catDefs.find(c=>c.key===saved.catKey);
+  if(def){currentCatDef=def;currentCatItems=def.mixed?allItems.filter(it=>it.cat===def.label):allItems.filter(it=>it.cat===def.label&&it.status===def.status);renderList();}
   else renderCatSelect();
 }
 
@@ -418,13 +429,15 @@ async function loadOfficeDataFromGitHub(){
 function renderCatSelect(){
   hs(`${currentOffice.name} — 担当を選択`);sp('',0,0);sbb(false);
   const cdm={};
-  CAT_DEFS.forEach(def=>{const its=allItems.filter(it=>it.cat===def.label&&it.status===def.status);const dn=its.filter(it=>counts[allItems.indexOf(it)]!==undefined).length;cdm[def.key]={total:its.length,done:dn};});
-  const bts=CAT_DEFS.map(def=>{
+  const activeCatDefs=getOfficeCatDefs(currentOffice.key);
+  activeCatDefs.forEach(def=>{const its=def.mixed?allItems.filter(it=>it.cat===def.label):allItems.filter(it=>it.cat===def.label&&it.status===def.status);const dn=its.filter(it=>counts[allItems.indexOf(it)]!==undefined).length;cdm[def.key]={total:its.length,done:dn};});
+  const bts=activeCatDefs.map(def=>{
     const{total,done}=cdm[def.key];if(total===0)return'';
     const dh=done>0?`<span class="cat-done">✓ ${done}/${total}件済み</span>`:`<span class="cat-count">${total}件</span>`;
     const hasCounts=done>0;
+    const statusLabel=def.mixed?'新品・中古':def.status;
     return`<div style="position:relative;">
-      <button class="cat-btn ${def.cc}" data-key="${def.key}"><span>${def.label}</span><span class="csb">${def.status}</span>${dh}</button>
+      <button class="cat-btn ${def.cc}" data-key="${def.key}"><span>${def.label}</span><span class="csb">${statusLabel}</span>${dh}</button>
       ${hasCounts?`<button class="cat-clear-btn" data-key="${def.key}" title="このカテゴリをクリア">🗑</button>`:''}
     </div>`;
   }).join('');
@@ -438,21 +451,23 @@ function renderCatSelect(){
     <button class="btn btn-ghost" id="reload">🔄 GitHubから再読み込み</button>`;
   document.querySelectorAll('.cat-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
-      const def=CAT_DEFS.find(d=>d.key===btn.dataset.key);
-      currentCatDef=def;currentCatItems=allItems.filter(it=>it.cat===def.label&&it.status===def.status);renderList();
+      const def=activeCatDefs.find(d=>d.key===btn.dataset.key);
+      currentCatDef=def;currentCatItems=def.mixed?allItems.filter(it=>it.cat===def.label):allItems.filter(it=>it.cat===def.label&&it.status===def.status);renderList();
     });
   });
   // カテゴリ個別クリアボタン
   document.querySelectorAll('.cat-clear-btn').forEach(btn=>{
     btn.addEventListener('click',e=>{
       e.stopPropagation();
-      const def=CAT_DEFS.find(d=>d.key===btn.dataset.key);
-      if(!confirm(`「${def.label}（${def.status}）」のカウントをクリアしますか？`))return;
+      const def=activeCatDefs.find(d=>d.key===btn.dataset.key);
+      const tl2=def.mixed?`${def.label}（新品・中古）`:`${def.label}（${def.status}）`;
+      if(!confirm(`「${tl2}」のカウントをクリアしますか？`))return;
       // そのカテゴリの商品だけカウントを削除
-      const its=allItems.filter(it=>it.cat===def.label&&it.status===def.status);
+      const its=def.mixed?allItems.filter(it=>it.cat===def.label):allItems.filter(it=>it.cat===def.label&&it.status===def.status);
       its.forEach(it=>{const g=allItems.indexOf(it);delete counts[g];delete notes[g];});
       saveOfficeData(currentOffice.key,{office:currentOffice.key,date:currentDate,allItems,counts,notes,catKey:currentCatDef?.key,savedAt:new Date().toISOString()});
-      toast(`🗑 ${def.label}（${def.status}）をクリアしました`);
+      const tl3=def.mixed?`${def.label}（新品・中古）`:`${def.label}（${def.status}）`;
+      toast(`🗑 ${tl3}をクリアしました`);
       renderCatSelect();
     });
   });
