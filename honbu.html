@@ -467,7 +467,7 @@ async function doUpload() {
     for (var i = 0; i < offices.length; i++) {
       var off = offices[i];
       var initItems = getOrderedItems(off).map(function(it) {
-        return {hinban:it.hinban||'', name:it.name, state:it.state, category:it.category||'', core:it.core||0};
+        return {hinban:it.hinban||'', name:it.name, status:it.state, cat:toCat(it.category), core:it.core||0};
       });
       try {
         await fetch(gasUrl, {
@@ -483,11 +483,14 @@ async function doUpload() {
   var errors = [];
   for (var j = 0; j < offices.length; j++) {
     var office = offices[j];
+    var now = new Date();
+    var dateLabel = now.getFullYear() + '年' + (now.getMonth()+1) + '月';
     var payload = {
       office: office,
+      date: dateLabel,
       gasUrl: gasUrl,
       items: getOrderedItems(office).map(function(it) {
-        return {hinban:it.hinban||'', name:it.name, state:it.state, category:toCat(it.category), core:it.core||0};
+        return {hinban:it.hinban||'', name:it.name, status:it.state, cat:toCat(it.category), core:it.core||0};
       })
     };
     var content = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
