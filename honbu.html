@@ -19,9 +19,12 @@ header{background:#1A1A18;color:#fff;padding:14px 20px;font-size:16px;font-weigh
 .st.ok{color:#2e7d32;font-weight:700}
 .st.er{color:#c62828;font-weight:700}
 .btn{padding:10px 20px;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;transition:.2s}
-.btn-dark{background:#1A1A18;color:#fff}.btn-dark:hover{background:#333}
-.btn-green{background:#2e7d32;color:#fff}.btn-green:hover{background:#1b5e20}
-.btn-gray{background:#e0e0e0;color:#333}.btn-gray:hover{background:#bdbdbd}
+.btn-dark{background:#1A1A18;color:#fff}
+.btn-dark:hover{background:#333}
+.btn-green{background:#2e7d32;color:#fff}
+.btn-green:hover{background:#1b5e20}
+.btn-gray{background:#e0e0e0;color:#333}
+.btn-gray:hover{background:#bdbdbd}
 .btn-sm{padding:6px 14px;font-size:12px}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
 .row input[type=text],.row input[type=password]{flex:1;min-width:200px;padding:8px 10px;border:1px solid #ccc;border-radius:4px;font-size:13px}
@@ -37,14 +40,14 @@ header{background:#1A1A18;color:#fff;padding:14px 20px;font-size:16px;font-weigh
 .sort-ctrl{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .locked-badge{font-size:12px;color:#2e7d32;font-weight:600;background:#e8f5e9;padding:3px 10px;border-radius:10px}
 .sort-ul{list-style:none;border:1px solid #e0e0e0;border-radius:6px;max-height:420px;overflow-y:auto}
-.sort-li{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f0f0f0;background:#fff}
+.sort-li{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f0f0f0;background:#fff;user-select:none}
 .sort-li:last-child{border-bottom:none}
 .sort-li:nth-child(even){background:#fafafa}
-.sort-li.dragging{opacity:.3}
+.sort-li.dragging{opacity:.3;background:#e3f2fd}
 .sort-li.over{border-top:2px solid #1976d2}
-.handle{cursor:grab;color:#bbb;font-size:18px;flex-shrink:0;user-select:none}
+.handle{cursor:grab;color:#bbb;font-size:18px;flex-shrink:0}
 .handle:active{cursor:grabbing}
-.num{color:#aaa;font-size:12px;width:26px;text-align:right;flex-shrink:0}
+.inum{color:#aaa;font-size:12px;width:26px;text-align:right;flex-shrink:0}
 .iname{flex:1;font-size:13px}
 .istate{font-size:11px;color:#888;background:#f0f0f0;padding:2px 7px;border-radius:10px}
 </style>
@@ -94,8 +97,8 @@ header{background:#1A1A18;color:#fff;padding:14px 20px;font-size:16px;font-weigh
 
 <!-- ③ 並び順 -->
 <div class="card" id="secSort" style="display:none">
-  <h2>③ 商品の並び順を設定</h2>
-  <div class="info">営業所タブを選択してドラッグ＆ドロップで並び替え。「固定」すると次回も保持されます。</div>
+  <h2>③ 商品の並び順を設定（営業所ごと）</h2>
+  <div class="info">営業所タブを選んでドラッグ＆ドロップで並び替え。「🔒 固定」すると次回CSVを読み込んでもこの順番が維持されます。</div>
   <div class="sort-tabs" id="sortTabs"></div>
   <div class="sort-ctrl">
     <button class="btn btn-dark btn-sm" id="btnLock" onclick="doLock()">🔒 並び順を固定</button>
@@ -118,136 +121,152 @@ header{background:#1A1A18;color:#fff;padding:14px 20px;font-size:16px;font-weigh
 </div>
 
 </div>
-
 <script>
-// ===== 定数 =====
 var GH_USER = 'kawasakifamilia1121-byte';
 var GH_REPO = 'zaiko-count';
 var OFFICES = ['福岡1','福岡2','広島1','広島2','四国','南九州'];
-var OFFICE_MAP = {'福岡':'福岡1','広島':'広島1','四国':'四国','南九州':'南九州',
-  '福岡1':'福岡1','福岡2':'福岡2','広島1':'広島1','広島2':'広島2'};
+var OFFICE_MAP = {
+  '福岡':'福岡1','広島':'広島1',
+  '福岡1':'福岡1','福岡2':'福岡2',
+  '広島1':'広島1','広島2':'広島2',
+  '四国':'四国','南九州':'南九州'
+};
 var CATS = ['家電（新品）','家電（中古）','家具（新品）','家具（中古）',
-  '布団・カーテン（新品）','布団・カーテン（中古）','その他'];
+            '布団・カーテン（新品）','布団・カーテン（中古）','その他'];
 
-// ===== 状態 =====
-var master = {};       // key(name|state) -> {hinban,name,state,category}
-var stockByOffice = {}; // office -> [{hinban,name,state,category,core}]
+var master = {};
+var stockByOffice = {};
 var newItems = [];
-var sortOrders = {};   // office -> [key,...]
-var sortLocked = {};   // office -> bool
+var sortOrders = {};
+var sortLocked = {};
 var curOffice = '';
 var dragSrc = null;
 
-// ===== 初期化 =====
+// 初期化
 (function(){
-  try { master = JSON.parse(localStorage.getItem('master_v3')||'{}'); } catch(e){}
-  if(Object.keys(master).length){
-    document.getElementById('stMaster').textContent = '✓ 保存済み '+Object.keys(master).length+'件（自動読込）';
+  try { master = JSON.parse(localStorage.getItem('master_v3') || '{}'); } catch(e) {}
+  if (Object.keys(master).length) {
+    document.getElementById('stMaster').textContent = '✓ 保存済み ' + Object.keys(master).length + '件（自動読込）';
     document.getElementById('stMaster').className = 'st ok';
   }
   try {
-    var o = JSON.parse(localStorage.getItem('sortOrder_v3')||'{}');
-    sortOrders = o.orders||{};
-    sortLocked = o.locked||{};
-  } catch(e){}
-  var g = localStorage.getItem('gasUrl_v3')||'';
-  if(g) document.getElementById('inGas').value = g;
-  var t = localStorage.getItem('ghToken_v3')||'';
-  if(t) document.getElementById('inToken').value = t;
+    var o = JSON.parse(localStorage.getItem('sortOrder_v3') || '{}');
+    sortOrders = o.orders || {};
+    sortLocked = o.locked || {};
+  } catch(e) {}
+  var g = localStorage.getItem('gasUrl_v3') || '';
+  if (g) document.getElementById('inGas').value = g;
+  var t = localStorage.getItem('ghToken_v3') || '';
+  if (t) document.getElementById('inToken').value = t;
 })();
 
-// ===== CSV解析 =====
-function parseCSV(text){
+// CSV解析
+function parseCSV(text) {
   var lines = text.trim().split(/\r?\n/);
   var headers = splitLine(lines[0]);
   var rows = [];
-  for(var i=1;i<lines.length;i++){
-    if(!lines[i].trim()) continue;
+  for (var i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
     var cols = splitLine(lines[i]);
-    var obj={};
-    headers.forEach(function(h,j){ obj[h]=(cols[j]||'').trim(); });
+    var obj = {};
+    headers.forEach(function(h, j) { obj[h] = (cols[j] || '').trim(); });
     rows.push(obj);
   }
   return rows;
 }
 
-function splitLine(line){
-  var res=[],cur='',inQ=false;
-  for(var i=0;i<line.length;i++){
-    var c=line[i];
-    if(c==='"'){inQ=!inQ;}
-    else if(c===','&&!inQ){res.push(cur.replace(/^"|"$/g,''));cur='';}
-    else{cur+=c;}
+function splitLine(line) {
+  var res = [], cur = '', inQ = false;
+  for (var i = 0; i < line.length; i++) {
+    var c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { res.push(cur.replace(/^"|"$/g,'')); cur = ''; }
+    else { cur += c; }
   }
   res.push(cur.replace(/^"|"$/g,''));
   return res;
 }
 
-// ===== マスターCSV =====
-document.getElementById('fMaster').addEventListener('change',function(e){
-  var f=e.target.files[0]; if(!f) return;
-  readText(f,function(text){
-    var rows=parseCSV(text);
-    master={};
-    rows.forEach(function(r){
-      var hinban=r['品番']||Object.values(r)[0]||'';
-      var name=r['商品名']||Object.values(r)[1]||'';
-      var state=r['商品状態']||Object.values(r)[2]||'';
-      var cat=r['種別']||Object.values(r)[3]||'';
-      if(!name) return;
-      master[name+'|'+state]={hinban:hinban,name:name,state:state,category:cat};
+function readText(file, cb) {
+  var r = new FileReader();
+  r.onload = function(e) { cb(e.target.result); };
+  r.readAsText(file, 'UTF-8');
+}
+
+// マスターCSV読み込み
+document.getElementById('fMaster').addEventListener('change', function(e) {
+  var f = e.target.files[0];
+  if (!f) return;
+  readText(f, function(text) {
+    var rows = parseCSV(text);
+    master = {};
+    rows.forEach(function(r) {
+      var vals = Object.values(r);
+      var hinban = r['品番'] || vals[0] || '';
+      var name   = r['商品名'] || vals[1] || '';
+      var state  = r['商品状態'] || vals[2] || '';
+      var cat    = r['種別'] || vals[3] || '';
+      if (!name) return;
+      master[name + '|' + state] = {hinban:hinban, name:name, state:state, category:cat};
     });
-    localStorage.setItem('master_v3',JSON.stringify(master));
-    document.getElementById('stMaster').textContent='✓ '+Object.keys(master).length+'件読み込み済み';
-    document.getElementById('stMaster').className='st ok';
+    localStorage.setItem('master_v3', JSON.stringify(master));
+    document.getElementById('stMaster').textContent = '✓ ' + Object.keys(master).length + '件読み込み済み';
+    document.getElementById('stMaster').className = 'st ok';
   });
 });
 
-function downloadMaster(){
-  var rows=['\uFEFF品番,商品名,商品状態,種別'];
-  Object.values(master).forEach(function(m){
-    rows.push([m.hinban,m.name,m.state,m.category].map(function(v){return '"'+v+'"';}).join(','));
+function downloadMaster() {
+  var rows = ['\uFEFF品番,商品名,商品状態,種別'];
+  Object.values(master).forEach(function(m) {
+    rows.push([m.hinban,m.name,m.state,m.category].map(function(v){ return '"'+(v||'')+'"'; }).join(','));
   });
-  downloadBlob(rows.join('\n'),'master_updated_'+today()+'.csv','text/csv');
+  var blob = new Blob([rows.join('\n')], {type:'text/csv'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'master_' + today() + '.csv';
+  a.click();
 }
 
-// ===== 在庫CSV =====
-document.getElementById('fStock').addEventListener('change',function(e){
-  var files=Array.from(e.target.files); if(!files.length) return;
-  stockByOffice={};
-  var done=0;
-  files.forEach(function(f){
-    readText(f,function(text){
-      var rows=parseCSV(text);
-      rows.forEach(function(r){
-        var rawOffice=r['倉庫']||Object.values(r)[0]||'';
-        var office=OFFICE_MAP[rawOffice]||rawOffice;
-        if(OFFICES.indexOf(office)<0) return;
-        var name=r['商品名']||Object.values(r)[1]||'';
-        var state=r['商品状態']||Object.values(r)[2]||'';
-        var kind=r['種別']||Object.values(r)[3]||'';
-        if(kind!=='在庫') return;
-        var core=parseInt(Object.values(r)[4])||0;
-        var mkey=name+'|'+state;
-        var mdata=master[mkey]||{};
-        if(!stockByOffice[office]) stockByOffice[office]=[];
+// 在庫CSV読み込み
+document.getElementById('fStock').addEventListener('change', function(e) {
+  var files = Array.from(e.target.files);
+  if (!files.length) return;
+  stockByOffice = {};
+  var done = 0;
+  files.forEach(function(f) {
+    readText(f, function(text) {
+      var rows = parseCSV(text);
+      rows.forEach(function(r) {
+        var vals = Object.values(r);
+        var rawOffice = r['倉庫'] || vals[0] || '';
+        var office = OFFICE_MAP[rawOffice] || rawOffice;
+        if (OFFICES.indexOf(office) < 0) return;
+        var name  = r['商品名'] || vals[1] || '';
+        var state = r['商品状態'] || vals[2] || '';
+        var kind  = r['種別'] || vals[3] || '';
+        if (kind !== '在庫') return;
+        var core = parseInt(vals[4]) || 0;
+        if (!name) return;
+        var mkey = name + '|' + state;
+        var mdata = master[mkey] || {};
+        if (!stockByOffice[office]) stockByOffice[office] = [];
         stockByOffice[office].push({
-          hinban:mdata.hinban||'',
-          name:name,
-          state:state,
-          category:mdata.category||'',
-          core:core
+          hinban: mdata.hinban || '',
+          name: name,
+          state: state,
+          category: mdata.category || '',
+          core: core
         });
       });
       done++;
-      if(done===files.length){
-        var offices=Object.keys(stockByOffice);
-        document.getElementById('stStock').textContent='✓ '+files.length+'ファイル / '+offices.length+'営業所';
-        document.getElementById('stStock').className='st ok';
+      if (done === files.length) {
+        var offices = Object.keys(stockByOffice);
+        document.getElementById('stStock').textContent = '✓ ' + files.length + 'ファイル / ' + offices.length + '営業所';
+        document.getElementById('stStock').className = offices.length > 0 ? 'st ok' : 'st er';
         checkNew();
-        if(offices.length>0){
-          document.getElementById('secSort').style.display='';
-          document.getElementById('secUpload').style.display='';
+        if (offices.length > 0) {
+          document.getElementById('secSort').style.display = '';
+          document.getElementById('secUpload').style.display = '';
           initSortTabs(offices);
         }
       }
@@ -255,218 +274,247 @@ document.getElementById('fStock').addEventListener('change',function(e){
   });
 });
 
-function checkNew(){
-  newItems=[];
-  var seen={};
-  Object.values(stockByOffice).forEach(function(items){
-    items.forEach(function(item){
-      var k=item.name+'|'+item.state;
-      if(!item.category&&!seen[k]){ seen[k]=1; newItems.push({name:item.name,state:item.state}); }
+// 新規商品チェック
+function checkNew() {
+  newItems = [];
+  var seen = {};
+  Object.values(stockByOffice).forEach(function(items) {
+    items.forEach(function(item) {
+      var k = item.name + '|' + item.state;
+      if (!item.category && !seen[k]) { seen[k] = 1; newItems.push({name:item.name, state:item.state}); }
     });
   });
-  if(newItems.length){
-    var html=newItems.map(function(it,i){
-      return '<div class="new-item"><span>'+it.name+' '+it.state+'</span>'+
-        '<select id="nc_'+i+'">'+CATS.map(function(c){return '<option>'+c+'</option>';}).join('')+'</select></div>';
+  if (newItems.length) {
+    var html = newItems.map(function(it, i) {
+      return '<div class="new-item"><span>' + it.name + ' ' + it.state + '</span>' +
+        '<select id="nc_' + i + '">' + CATS.map(function(c){ return '<option>' + c + '</option>'; }).join('') + '</select></div>';
     }).join('');
-    document.getElementById('newItemList').innerHTML=html;
-    document.getElementById('newItemWrap').style.display='';
+    document.getElementById('newItemList').innerHTML = html;
+    document.getElementById('newItemWrap').style.display = '';
   } else {
-    document.getElementById('newItemWrap').style.display='none';
+    document.getElementById('newItemWrap').style.display = 'none';
   }
 }
 
-function confirmNew(){
-  newItems.forEach(function(it,i){
-    var sel=document.getElementById('nc_'+i);
-    var cat=sel?sel.value:'';
-    var k=it.name+'|'+it.state;
-    master[k]={hinban:'',name:it.name,state:it.state,category:cat};
-    Object.values(stockByOffice).forEach(function(items){
-      items.forEach(function(item){
-        if(item.name===it.name&&item.state===it.state) item.category=cat;
+function confirmNew() {
+  newItems.forEach(function(it, i) {
+    var sel = document.getElementById('nc_' + i);
+    var cat = sel ? sel.value : '';
+    var k = it.name + '|' + it.state;
+    master[k] = {hinban:'', name:it.name, state:it.state, category:cat};
+    Object.values(stockByOffice).forEach(function(items) {
+      items.forEach(function(item) {
+        if (item.name === it.name && item.state === it.state) item.category = cat;
       });
     });
   });
-  localStorage.setItem('master_v3',JSON.stringify(master));
-  document.getElementById('newItemWrap').style.display='none';
+  localStorage.setItem('master_v3', JSON.stringify(master));
+  document.getElementById('newItemWrap').style.display = 'none';
   alert('✅ カテゴリを確定しました');
 }
 
-// ===== GAS =====
-function saveGas(){
-  var v=document.getElementById('inGas').value.trim();
-  localStorage.setItem('gasUrl_v3',v);
-  document.getElementById('stGas').textContent='✓ 保存';
-  document.getElementById('stGas').className='st ok';
+// GAS保存
+function saveGas() {
+  var v = document.getElementById('inGas').value.trim();
+  localStorage.setItem('gasUrl_v3', v);
+  document.getElementById('stGas').textContent = '✓ 保存しました';
+  document.getElementById('stGas').className = 'st ok';
 }
 
-function saveToken(){
-  localStorage.setItem('ghToken_v3',document.getElementById('inToken').value.trim());
+function saveToken() {
+  localStorage.setItem('ghToken_v3', document.getElementById('inToken').value.trim());
   alert('✅ トークンを保存しました');
 }
 
 // ===== 並び替え =====
-function initSortTabs(offices){
-  curOffice=offices[0];
-  var tabsEl=document.getElementById('sortTabs');
-  tabsEl.innerHTML=offices.map(function(o){
-    return '<button class="sort-tab" data-o="'+o+'" onclick="switchTab(\''+o+'\')">'+o+'</button>';
+function initSortTabs(offices) {
+  var tabsEl = document.getElementById('sortTabs');
+  tabsEl.innerHTML = offices.map(function(o) {
+    return '<button class="sort-tab" onclick="switchTab(\'' + o + '\')" data-o="' + o + '">' + o + '</button>';
   }).join('');
   switchTab(offices[0]);
 }
 
-function switchTab(office){
-  curOffice=office;
-  document.querySelectorAll('.sort-tab').forEach(function(b){
-    b.classList.toggle('active',b.getAttribute('data-o')===office);
+function switchTab(office) {
+  curOffice = office;
+  document.querySelectorAll('.sort-tab').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-o') === office);
   });
-  var locked=sortLocked[office]||false;
-  document.getElementById('btnLock').style.display=locked?'none':'';
-  document.getElementById('btnEdit').style.display=locked?'':'none';
-  document.getElementById('lockBadge').style.display=locked?'':'none';
+  var locked = sortLocked[office] || false;
+  document.getElementById('btnLock').style.display = locked ? 'none' : '';
+  document.getElementById('btnEdit').style.display = locked ? '' : 'none';
+  document.getElementById('lockBadge').style.display = locked ? '' : 'none';
   renderSortList(office);
 }
 
-function getOrderedItems(office){
-  var items=stockByOffice[office]||[];
-  var order=sortOrders[office];
-  if(!order||!order.length) return items.slice();
-  var map={};
-  items.forEach(function(it){ map[it.name+'|'+it.state]=it; });
-  var result=[];
-  order.forEach(function(k){ if(map[k]){result.push(map[k]);delete map[k];} });
-  Object.values(map).forEach(function(it){ result.push(it); });
+function getOrderedItems(office) {
+  var items = (stockByOffice[office] || []).slice();
+  var order = sortOrders[office];
+  if (!order || !order.length) return items;
+  var map = {};
+  items.forEach(function(it) { map[it.name + '|' + it.state] = it; });
+  var result = [];
+  order.forEach(function(k) { if (map[k]) { result.push(map[k]); delete map[k]; } });
+  Object.keys(map).forEach(function(k) { result.push(map[k]); });
   return result;
 }
 
-function renderSortList(office){
-  var items=getOrderedItems(office);
-  var locked=sortLocked[office]||false;
-  var ul=document.getElementById('sortUl');
-  ul.innerHTML=items.map(function(it,i){
-    var k=it.name+'|'+it.state;
-    var handle=locked?'<span style="width:22px;display:inline-block"></span>':'<span class="handle">⠿</span>';
-    return '<li class="sort-li" data-key="'+k+'" '+(locked?'':'draggable="true"')+'>'+
-      handle+'<span class="num">'+(i+1)+'</span>'+
-      '<span class="iname">'+it.name+'</span>'+
-      '<span class="istate">'+it.state+'</span></li>';
-  }).join('');
-  if(!locked){
-    ul.querySelectorAll('.sort-li').forEach(function(el){
-      el.addEventListener('dragstart',function(e){
-        dragSrc=this; this.classList.add('dragging');
-        e.dataTransfer.effectAllowed='move';
+function renderSortList(office) {
+  var items = getOrderedItems(office);
+  var locked = sortLocked[office] || false;
+  var ul = document.getElementById('sortUl');
+  ul.innerHTML = '';
+  items.forEach(function(it, i) {
+    var li = document.createElement('li');
+    li.className = 'sort-li';
+    li.setAttribute('data-key', it.name + '|' + it.state);
+    if (!locked) li.setAttribute('draggable', 'true');
+    li.innerHTML = (locked ? '<span style="width:22px;display:inline-block"></span>' : '<span class="handle">⠿</span>') +
+      '<span class="inum">' + (i+1) + '</span>' +
+      '<span class="iname">' + it.name + '</span>' +
+      '<span class="istate">' + it.state + '</span>';
+    if (!locked) {
+      li.addEventListener('dragstart', onDragStart);
+      li.addEventListener('dragover', onDragOver);
+      li.addEventListener('drop', onDrop);
+      li.addEventListener('dragend', onDragEnd);
+    }
+    ul.appendChild(li);
+  });
+}
+
+function onDragStart(e) {
+  dragSrc = this;
+  this.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.sort-li').forEach(function(x) { x.classList.remove('over'); });
+  this.classList.add('over');
+}
+
+function onDrop(e) {
+  e.preventDefault();
+  if (dragSrc === this) return;
+  var ul = document.getElementById('sortUl');
+  var els = Array.from(ul.children);
+  var si = els.indexOf(dragSrc);
+  var ti = els.indexOf(this);
+  if (si < ti) ul.insertBefore(dragSrc, this.nextSibling);
+  else ul.insertBefore(dragSrc, this);
+  Array.from(ul.children).forEach(function(x, j) {
+    x.querySelector('.inum').textContent = j + 1;
+    x.classList.remove('over');
+  });
+  saveOrder();
+}
+
+function onDragEnd() {
+  this.classList.remove('dragging');
+  document.querySelectorAll('.sort-li').forEach(function(x) { x.classList.remove('over'); });
+  dragSrc = null;
+}
+
+function saveOrder() {
+  var keys = Array.from(document.getElementById('sortUl').children).map(function(el) {
+    return el.getAttribute('data-key');
+  });
+  sortOrders[curOffice] = keys;
+  localStorage.setItem('sortOrder_v3', JSON.stringify({orders:sortOrders, locked:sortLocked}));
+}
+
+function doLock() {
+  saveOrder();
+  sortLocked[curOffice] = true;
+  localStorage.setItem('sortOrder_v3', JSON.stringify({orders:sortOrders, locked:sortLocked}));
+  switchTab(curOffice);
+}
+
+function doEdit() {
+  sortLocked[curOffice] = false;
+  localStorage.setItem('sortOrder_v3', JSON.stringify({orders:sortOrders, locked:sortLocked}));
+  switchTab(curOffice);
+}
+
+// ===== GitHubアップロード =====
+async function doUpload() {
+  var token = document.getElementById('inToken').value.trim() || localStorage.getItem('ghToken_v3') || '';
+  if (!token) { alert('GitHubトークンを入力してください'); return; }
+  var offices = Object.keys(stockByOffice);
+  if (!offices.length) { alert('在庫CSVを先に読み込んでください'); return; }
+  var gasUrl = document.getElementById('inGas').value.trim() || localStorage.getItem('gasUrl_v3') || '';
+  var stEl = document.getElementById('stUpload');
+  stEl.textContent = 'アップロード中...';
+  stEl.className = 'st';
+
+  // GASにシート初期化送信
+  if (gasUrl) {
+    for (var i = 0; i < offices.length; i++) {
+      var off = offices[i];
+      var initItems = getOrderedItems(off).map(function(it) {
+        return {hinban:it.hinban||'', name:it.name, state:it.state, category:it.category||'', core:it.core||0};
       });
-      el.addEventListener('dragover',function(e){
-        e.preventDefault();
-        ul.querySelectorAll('.sort-li').forEach(function(x){x.classList.remove('over');});
-        this.classList.add('over');
-      });
-      el.addEventListener('drop',function(e){
-        e.preventDefault();
-        if(dragSrc===this) return;
-        var els=Array.from(ul.children);
-        var si=els.indexOf(dragSrc), ti=els.indexOf(this);
-        if(si<ti) ul.insertBefore(dragSrc,this.nextSibling);
-        else ul.insertBefore(dragSrc,this);
-        Array.from(ul.children).forEach(function(x,j){
-          x.querySelector('.num').textContent=j+1;
-          x.classList.remove('over');
+      try {
+        await fetch(gasUrl, {
+          method: 'POST', mode: 'no-cors',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({action:'initSheet', office:off, items:initItems})
         });
-        saveOrder();
-      });
-      el.addEventListener('dragend',function(){
-        this.classList.remove('dragging');
-        ul.querySelectorAll('.sort-li').forEach(function(x){x.classList.remove('over');});
-        dragSrc=null;
-      });
-    });
-  }
-}
-
-function saveOrder(){
-  var keys=Array.from(document.getElementById('sortUl').children).map(function(el){return el.getAttribute('data-key');});
-  sortOrders[curOffice]=keys;
-  persistSort();
-}
-
-function doLock(){ saveOrder(); sortLocked[curOffice]=true; persistSort(); switchTab(curOffice); }
-function doEdit(){ sortLocked[curOffice]=false; persistSort(); switchTab(curOffice); }
-function persistSort(){ localStorage.setItem('sortOrder_v3',JSON.stringify({orders:sortOrders,locked:sortLocked})); }
-
-// ===== GitHub アップロード =====
-async function doUpload(){
-  var token=document.getElementById('inToken').value.trim()||localStorage.getItem('ghToken_v3')||'';
-  if(!token){alert('GitHubトークンを入力してください');return;}
-  var offices=Object.keys(stockByOffice);
-  if(!offices.length){alert('在庫CSVを先に読み込んでください');return;}
-  var gasUrl=document.getElementById('inGas').value.trim()||localStorage.getItem('gasUrl_v3')||'';
-  var stEl=document.getElementById('stUpload');
-  stEl.textContent='アップロード中...'; stEl.className='st';
-
-  // GASにシート初期化
-  if(gasUrl){
-    for(var i=0;i<offices.length;i++){
-      var off=offices[i];
-      var items=getOrderedItems(off);
-      try{
-        await fetch(gasUrl,{method:'POST',mode:'no-cors',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({action:'initSheet',office:off,
-            items:items.map(function(it){return {hinban:it.hinban||'',name:it.name,state:it.state,category:it.category||'',core:it.core||0};})
-          })});
-      }catch(e){}
+      } catch(e) {}
     }
   }
 
-  // GitHubにJSON
-  var errors=[];
-  for(var j=0;j<offices.length;j++){
-    var office=offices[j];
-    var payload={office:office,gasUrl:gasUrl,items:getOrderedItems(office).map(function(it){
-      return {hinban:it.hinban||'',name:it.name,state:it.state,category:it.category||'',core:it.core||0};
-    })};
-    var content=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-    var path='data/'+office+'.json';
-    var apiUrl='https://api.github.com/repos/'+GH_USER+'/'+GH_REPO+'/contents/'+path;
-    try{
-      var sha=null;
-      try{
-        var r=await fetch(apiUrl,{headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}});
-        if(r.ok){var d=await r.json();sha=d.sha;}
-      }catch(e2){}
-      var body={message:'Update '+office,content:content};
-      if(sha) body.sha=sha;
-      var res=await fetch(apiUrl,{method:'PUT',
-        headers:{'Authorization':'token '+token,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
-        body:JSON.stringify(body)});
-      if(!res.ok){var ed=await res.json();errors.push(office+':'+(ed.message||res.status));}
-    }catch(e3){errors.push(office+':通信エラー');}
+  // GitHubにJSONアップロード
+  var errors = [];
+  for (var j = 0; j < offices.length; j++) {
+    var office = offices[j];
+    var payload = {
+      office: office,
+      gasUrl: gasUrl,
+      items: getOrderedItems(office).map(function(it) {
+        return {hinban:it.hinban||'', name:it.name, state:it.state, category:it.category||'', core:it.core||0};
+      })
+    };
+    var content = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+    var path = 'data/' + office + '.json';
+    var apiUrl = 'https://api.github.com/repos/' + GH_USER + '/' + GH_REPO + '/contents/' + encodeURIComponent(path);
+    try {
+      var sha = null;
+      try {
+        var getRes = await fetch(apiUrl, {headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}});
+        if (getRes.ok) { var d = await getRes.json(); sha = d.sha; }
+      } catch(e2) {}
+      var body = {message:'Update '+office, content:content};
+      if (sha) body.sha = sha;
+      var putRes = await fetch(apiUrl, {
+        method: 'PUT',
+        headers: {'Authorization':'token '+token,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
+        body: JSON.stringify(body)
+      });
+      if (!putRes.ok) {
+        var ed = await putRes.json();
+        errors.push(office + ':' + (ed.message || putRes.status));
+      }
+    } catch(e3) {
+      errors.push(office + ':通信エラー');
+    }
   }
 
-  if(errors.length){stEl.textContent='⚠️ エラー: '+errors.join(', ');stEl.className='st er';}
-  else{stEl.textContent='✅ '+offices.length+'営業所をアップロードしました！';stEl.className='st ok';}
+  if (errors.length) {
+    stEl.textContent = '⚠️ エラー: ' + errors.join(', ');
+    stEl.className = 'st er';
+  } else {
+    stEl.textContent = '✅ ' + offices.length + '営業所をアップロードしました！';
+    stEl.className = 'st ok';
+  }
 }
 
-// ===== ユーティリティ =====
-function readText(file,cb){
-  var r=new FileReader();
-  r.onload=function(e){cb(e.target.result);};
-  r.readAsText(file,'UTF-8');
-}
-
-function today(){
-  var d=new Date();
-  return d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2);
-}
-
-function downloadBlob(content,filename,type){
-  var blob=new Blob([content],{type:type});
-  var a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=filename;
-  a.click();
+function today() {
+  var d = new Date();
+  return d.getFullYear() + ('0'+(d.getMonth()+1)).slice(-2) + ('0'+d.getDate()).slice(-2);
 }
 </script>
 </body>
