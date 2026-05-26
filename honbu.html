@@ -264,9 +264,7 @@ function render(){
       <h2>③ 商品の並び順を設定</h2>
       <p class="sub">営業所ごとに並び順を設定できます。「並び順を固定」を押すと確定します。修正したい場合は「並び順を変更」を押してください。</p>
       <div class="sort-wrap">
-        <div class="sort-office-tabs" id="sort-tabs">
-          ${Object.keys(stockByOffice).map((o,i)=>`<button class="sort-tab${i===0?' active':''}" data-office="${o}">${o}</button>`).join('')}
-        </div>
+        <div class="sort-office-tabs" id="sort-tabs"></div>
         <div style="display:flex;gap:8px;margin-bottom:1rem;" id="sort-btn-wrap">
           <button class="btn btn-primary" id="sort-fix-btn" style="padding:9px 20px;font-size:13px;">🔒 並び順を固定</button>
           <button class="btn btn-ghost" id="sort-edit-btn" style="padding:9px 20px;font-size:13px;display:none;">✏️ 並び順を変更</button>
@@ -439,11 +437,6 @@ function initSortTabs(){
     renderSortList(currentSortOffice);
     toast(`✏️ ${currentSortOffice}の並び順を編集できます`);
   });
-}
-
-render();
-// 並び替えタブを初期化
-if(stockLoaded)setTimeout(initSortTabs,100);}});
 
   document.getElementById('fm').addEventListener('change',e=>{
     const f=e.target.files[0];if(!f)return;
@@ -542,6 +535,9 @@ if(stockLoaded)setTimeout(initSortTabs,100);}});
     }
     document.getElementById('upload-all').disabled=false;
   });
+  }
+  }
+  }
 }
 
 render();
