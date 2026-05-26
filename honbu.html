@@ -487,7 +487,7 @@ async function doUpload() {
       office: office,
       gasUrl: gasUrl,
       items: getOrderedItems(office).map(function(it) {
-        return {hinban:it.hinban||'', name:it.name, state:it.state, category:it.category||'', core:it.core||0};
+        return {hinban:it.hinban||'', name:it.name, state:it.state, category:toCat(it.category), core:it.core||0};
       })
     };
     var content = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
@@ -527,6 +527,14 @@ async function doUpload() {
 function today() {
   var d = new Date();
   return d.getFullYear() + ('0'+(d.getMonth()+1)).slice(-2) + ('0'+d.getDate()).slice(-2);
+}
+
+function toCat(cat) {
+  if (!cat) return '';
+  if (cat.indexOf('家電') >= 0) return '家電';
+  if (cat.indexOf('家具') >= 0) return '家具';
+  if (cat.indexOf('布団') >= 0 || cat.indexOf('カーテン') >= 0) return '布団・カーテン';
+  return cat;
 }
 </script>
 </body>
