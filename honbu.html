@@ -177,6 +177,10 @@ var dragSrc = null;
     document.getElementById('stMaster').textContent = '✓ 保存済み ' + Object.keys(master).length + '件（自動読込）';
     document.getElementById('stMaster').className = 'st ok';
   }
+  // GitHubからマスターを読み込む（非同期）
+  setTimeout(function() {
+    loadMasterFromGitHub();
+  }, 500);
   try {
     var o = JSON.parse(localStorage.getItem('sortOrder_v3') || '{}');
     sortOrders = o.orders || {};
@@ -247,6 +251,7 @@ document.getElementById('fMaster').addEventListener('change', function(e) {
       master[name + '|' + state] = {hinban:hinban, name:name, state:state, category:cat};
     });
     localStorage.setItem('master_v3', JSON.stringify(master));
+    saveMasterToGitHub();
     document.getElementById('stMaster').textContent = '✓ ' + Object.keys(master).length + '件読み込み済み';
     document.getElementById('stMaster').className = 'st ok';
   });
@@ -351,6 +356,7 @@ function confirmNew() {
     });
   });
   localStorage.setItem('master_v3', JSON.stringify(master));
+  saveMasterToGitHub();
   document.getElementById('newItemWrap').style.display = 'none';
   alert('✅ カテゴリを確定しました');
 }
