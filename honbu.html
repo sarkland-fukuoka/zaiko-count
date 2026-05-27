@@ -120,9 +120,37 @@ header{background:#1A1A18;color:#fff;padding:14px 20px;font-size:16px;font-weigh
   <div class="st" id="stUpload" style="margin-top:8px"></div>
 </div>
 
+<!-- ⑤ マスター編集 -->
+<div class="card" id="secMasterEdit" style="display:none">
+  <h2>⑤ カテゴリの修正・確認</h2>
+  <div class="info">振り分けを間違えた商品のカテゴリをここで修正できます。修正後は④でGitHubにアップロードしてください。</div>
+  <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <input type="text" id="masterSearch" placeholder="商品名で絞り込み..." style="flex:1;min-width:160px;padding:7px 10px;border:1px solid #ccc;border-radius:4px;font-size:13px">
+    <select id="masterFilterCat" style="padding:7px 10px;border:1px solid #ccc;border-radius:4px;font-size:13px">
+      <option value="">すべてのカテゴリ</option>
+      <option>家電（新品）</option><option>家電（中古）</option>
+      <option>家具（新品）</option><option>家具（中古）</option>
+      <option>布団・カーテン（新品）</option><option>布団・カーテン（中古）</option>
+      <option>その他</option>
+    </select>
+  </div>
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="background:#1A1A18;color:#fff">
+          <th style="padding:8px;text-align:left">商品名</th>
+          <th style="padding:8px;text-align:left">状態</th>
+          <th style="padding:8px;text-align:left">カテゴリ</th>
+        </tr>
+      </thead>
+      <tbody id="masterEditBody"></tbody>
+    </table>
+  </div>
+</div>
+
 </div>
 <script>
-var GH_USER = 'kawasakifamilia1121-byte';
+var GH_USER = 'sarkland-fukuoka';
 var GH_REPO = 'zaiko-count';
 var OFFICES = ['福岡1','福岡2','広島1','広島2','四国','南九州'];
 var OFFICE_MAP = {
@@ -279,7 +307,9 @@ document.getElementById('fStock').addEventListener('change', function(e) {
         if (offices.length > 0) {
           document.getElementById('secSort').style.display = '';
           document.getElementById('secUpload').style.display = '';
+          document.getElementById('secMasterEdit').style.display = '';
           initSortTabs(offices);
+          renderMasterEdit();
         }
       }
     });
@@ -346,6 +376,14 @@ function initSortTabs(offices) {
   }).join('');
   switchTab(offices[0]);
 }
+
+// マスター編集の検索・フィルター
+(function() {
+  var s = document.getElementById('masterSearch');
+  var f = document.getElementById('masterFilterCat');
+  if (s) s.addEventListener('input', renderMasterEdit);
+  if (f) f.addEventListener('change', renderMasterEdit);
+})();
 
 function switchTab(office) {
   curOffice = office;
@@ -525,6 +563,58 @@ async function doUpload() {
     stEl.textContent = '✅ ' + offices.length + '営業所をアップロードしました！';
     stEl.className = 'st ok';
   }
+}
+
+// ===== ⑤ マスター編集 =====
+function renderMasterEdit() {
+  var searchEl = document.getElementById('masterSearch');
+  var filterEl = document.getElementById('masterFilterCat');
+  var keyword = (searchEl ? searchEl.value : '').trim().toLowerCase();
+  var filterCat = filterEl ? filterEl.value : '';
+
+  var items = Object.values(master);
+  if (keyword) items = items.filter(function(m){ return m.name.toLowerCase().indexOf(keyword) >= 0; });
+  if (filterCat) items = items.filter(function(m){ return m.category === filterCat; });
+
+  var tbody = document.getElementById('masterEditBody');
+  if (!tbody) return;
+
+  tbody.innerHTML = items.map(function(m, i) {
+    var key = m.name + '|' + m.state;
+    var safeKey = key.replace(/"/g,'&quot;');
+    return '<tr style="border-bottom:1px solid #eee;' + (i%2===0?'':'background:#fafafa') + '">' +
+      '<td style="padding:7px 8px">' + m.name + '</td>' +
+      '<td style="padding:7px 8px">' +
+        '<span style="font-size:11px;background:#f0f0f0;padding:2px 7px;border-radius:10px">' + m.state + '</span>' +
+      '</td>' +
+      '<td style="padding:7px 8px">' +
+        '<select data-key="' + safeKey + '" class="mcat-sel" style="padding:4px 8px;border:1px solid #ccc;border-radius:4px;font-size:12px">' +
+        CATS.map(function(c){ return '<option' + (m.category===c?' selected':'') + '>' + c + '</option>'; }).join('') +
+        '</select>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+// イベント委任でセレクトボックスの変更を検知
+document.addEventListener('change', function(e) {
+  if (e.target && e.target.classList.contains('mcat-sel')) {
+    updateMasterCat(e.target.getAttribute('data-key'), e.target.value);
+  }
+});
+
+function updateMasterCat(key, newCat) {
+  if (!master[key]) return;
+  master[key].category = newCat;
+  // stockByOfficeも更新
+  var parts = key.split('|');
+  var name = parts[0], state = parts[1];
+  Object.values(stockByOffice).forEach(function(items) {
+    items.forEach(function(item) {
+      if (item.name === name && item.state === state) item.category = newCat;
+    });
+  });
+  localStorage.setItem('master_v3', JSON.stringify(master));
 }
 
 function today() {
