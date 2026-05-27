@@ -191,7 +191,7 @@ h2{font-size:16px;font-weight:600;margin-bottom:4px;}
 <script>
 // ===== 設定 =====
 const GAS_URL='https://script.google.com/macros/s/AKfycbwdMcLiTAaZaf6Zt-3IK4sqk95nEkliUZpO9_lf1tmaPVduCBVX0pmXIrAHGRgmYgdBLw/exec';
-const GITHUB_USER='kawasakifamilia1121-byte';
+const GITHUB_USER='sarkland-fukuoka';
 const GITHUB_REPO='zaiko-count';
 const GITHUB_BRANCH='main';
 
@@ -566,7 +566,7 @@ function renderCountScreen(idx){
     const done=items.filter(it=>counts[allItems.indexOf(it)]!==undefined).length;
     hs(`${currentOffice.name} ${tl}`);sp(tl,done,items.length);sbb(true);
     sss('✓ 答え合わせのたびにスプレッドシートへ自動送信','ok');
-    renderList();
+    renderList(idx);
   });
 
   const inp=document.getElementById('cnt-inp');
@@ -654,7 +654,7 @@ function renderResult(){
     <button class="btn btn-ghost" id="bkl">← カウントに戻る</button>
     <button class="btn btn-ghost" id="bkc">別の担当をカウントする</button>
     <button class="btn btn-ghost" id="bkoff">別の営業所に切り替える</button>`;
-  document.getElementById('bkl').addEventListener('click',renderList);
+  document.getElementById('bkl').addEventListener('click',()=>renderList(idx));
   document.getElementById('bkc').addEventListener('click',renderCatSelect);
   document.getElementById('bkoff').addEventListener('click',renderOfficeSelect);
 }
