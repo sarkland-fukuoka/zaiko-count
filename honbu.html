@@ -355,10 +355,15 @@ function confirmNew() {
       });
     });
   });
+  // まずlocalStorageに保存（必ず成功）
   localStorage.setItem('master_v3', JSON.stringify(master));
-  saveMasterToGitHub();
+  // 画面を更新
   document.getElementById('newItemWrap').style.display = 'none';
-  alert('✅ カテゴリを確定しました');
+  newItems = [];
+  renderMasterEdit();
+  alert('✅ カテゴリを確定しました。GitHubにも保存中...');
+  // GitHubへの保存は非同期で（エラーでも止まらない）
+  saveMasterToGitHub().catch(function(e){ console.log('GitHub保存エラー:', e); });
 }
 
 // GAS保存
