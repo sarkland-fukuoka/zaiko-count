@@ -564,11 +564,11 @@ async function doUpload() {
   stEl.textContent = 'アップロード中...';
   stEl.className = 'st';
 
-  // GASにシート初期化送信
+  // GASにシート初期化送信（マスターCSVの元の順番で送る）
   if (gasUrl) {
     for (var i = 0; i < offices.length; i++) {
       var off = offices[i];
-      var initItems = getOrderedItems(off).map(function(it) {
+      var initItems = (stockByOffice[off] || []).map(function(it) {
         return {hinban:it.hinban||'', name:it.name, status:it.state, cat:toCat(it.category), core:it.core||0};
       });
       try {
