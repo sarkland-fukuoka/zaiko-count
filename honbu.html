@@ -48,6 +48,8 @@ header{background:#1A1A18;color:#fff;padding:14px 20px;font-size:16px;font-weigh
 .handle{cursor:grab;color:#bbb;font-size:18px;flex-shrink:0}
 .handle:active{cursor:grabbing}
 .inum{color:#aaa;font-size:12px;width:26px;text-align:right;flex-shrink:0}
+.inum-input{width:46px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;font-size:12px;text-align:center;color:#333}
+.inum-input:focus{border-color:#1A1A18;outline:none}
 .iname{flex:1;font-size:13px}
 .istate{font-size:11px;color:#888;background:#f0f0f0;padding:2px 7px;border-radius:10px}
 </style>
@@ -430,10 +432,16 @@ function renderSortList(office) {
     li.className = 'sort-li';
     li.setAttribute('data-key', it.name + '|' + it.state);
     if (!locked) li.setAttribute('draggable', 'true');
-    li.innerHTML = (locked ? '<span style="width:22px;display:inline-block"></span>' : '<span class="handle">⠿</span>') +
-      '<span class="inum">' + (i+1) + '</span>' +
+
+    var handleHtml = locked ? '<span style="width:22px;display:inline-block"></span>' : '<span class="handle">⠿</span>';
+    var numHtml = locked
+      ? '<span class="inum">' + (i+1) + '</span>'
+      : '<input type="number" class="inum-input" value="' + (i+1) + '" min="1" data-key="' + (it.name+'|'+it.state).replace(/"/g,'&quot;') + '" title="番号を入力してEnter">';
+
+    li.innerHTML = handleHtml + numHtml +
       '<span class="iname">' + it.name + '</span>' +
       '<span class="istate">' + it.state + '</span>';
+
     if (!locked) {
       li.addEventListener('dragstart', onDragStart);
       li.addEventListener('dragover', onDragOver);
@@ -442,6 +450,51 @@ function renderSortList(office) {
     }
     ul.appendChild(li);
   });
+
+  // 番号入力でEnterを押したとき並び替え
+  if (!locked) {
+    ul.querySelectorAll('.inum-input').forEach(function(input) {
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') applyNumInput(this, office);
+      });
+      input.addEventListener('blur', function() {
+        applyNumInput(this, office);
+      });
+      // ドラッグと競合しないようにinputのクリック・マウスダウンを止める
+      input.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+      input.addEventListener('click', function(e) { e.stopPropagation(); });
+    });
+  }
+}
+
+function applyNumInput(input, office) {
+  var ul = document.getElementById('sortUl');
+  var items = Array.from(ul.children);
+  var newNum = parseInt(input.value);
+  if (isNaN(newNum) || newNum < 1) { input.value = items.indexOf(input.closest('li')) + 1; return; }
+  newNum = Math.min(newNum, items.length);
+
+  var targetLi = input.closest('li');
+  var currentIdx = items.indexOf(targetLi);
+  var targetIdx = newNum - 1;
+  if (currentIdx === targetIdx) return;
+
+  // 並び替え実行
+  ul.removeChild(targetLi);
+  var refItems = Array.from(ul.children);
+  if (targetIdx >= refItems.length) {
+    ul.appendChild(targetLi);
+  } else {
+    ul.insertBefore(targetLi, refItems[targetIdx]);
+  }
+
+  // 番号を再振り
+  Array.from(ul.children).forEach(function(li, i) {
+    var inp = li.querySelector('.inum-input');
+    if (inp) inp.value = i + 1;
+  });
+
+  saveOrder();
 }
 
 function onDragStart(e) {
