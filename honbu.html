@@ -100,7 +100,12 @@ header{background:#1A1A18;color:#fff;padding:14px 20px;font-size:16px;font-weigh
 <!-- ③ 並び順 -->
 <div class="card" id="secSort" style="display:none">
   <h2>③ 商品の並び順を設定（営業所ごと）</h2>
-  <div class="info">営業所タブを選んでドラッグ＆ドロップ、または番号入力で並び替え。「🔒 固定」すると保存されます。<strong style="color:#c62828">固定後は必ず下の「④ GitHubにアップロード」を押してください。それまでは他のデバイスに反映されません。</strong></div>
+  <div class="info">営業所タブを選んでドラッグ＆ドロップ、または番号入力で並び替え。「🔒 固定」を押すとGitHubに保存され、<strong>次回以降は他のPCでマスター・在庫CSVを読み込むだけで自動的にこの順番が適用されます。</strong>（GitHubトークン未入力の場合はこのPCのみの保存になります）</div>
+  <div class="row" style="margin-bottom:10px">
+    <input type="password" id="inTokenSort" placeholder="GitHubトークン（④と共通）">
+    <button class="btn btn-gray btn-sm" onclick="saveTokenFromSort()">💾 保存</button>
+    <span class="st" id="stTokenSort"></span>
+  </div>
   <div class="sort-tabs" id="sortTabs"></div>
   <div class="sort-ctrl">
     <button class="btn btn-dark btn-sm" id="btnLock" onclick="doLock()">🔒 並び順を固定</button>
@@ -187,7 +192,11 @@ var dragSrc = null;
   var g = localStorage.getItem('gasUrl_v3') || '';
   if (g) document.getElementById('inGas').value = g;
   var t = localStorage.getItem('ghToken_v3') || '';
-  if (t) document.getElementById('inToken').value = t;
+  if (t) {
+    document.getElementById('inToken').value = t;
+    var ts = document.getElementById('inTokenSort');
+    if (ts) ts.value = t;
+  }
   // GitHubからマスター・並び順を読み込む（非同期、トークン不要）
   setTimeout(function() {
     loadMasterFromGitHub();
@@ -237,7 +246,10 @@ async function loadMasterFromGitHub() {
 // ===== GitHub保存・読込（並び順） =====
 async function saveSortOrderToGitHub() {
   var token = document.getElementById('inToken').value.trim() || localStorage.getItem('ghToken_v3') || '';
-  if (!token) return;
+  if (!token) {
+    console.warn('GitHubトークンが未入力のため、並び順はこのPCにのみ保存されました');
+    return false;
+  }
   var payload = {orders:sortOrders, locked:sortLocked};
   var content = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
   var apiUrl = 'https://api.github.com/repos/' + GH_USER + '/' + GH_REPO + '/contents/data/sortOrder.json';
@@ -249,12 +261,19 @@ async function saveSortOrderToGitHub() {
     } catch(e) {}
     var body = {message:'Update sortOrder', content:content};
     if (sha) body.sha = sha;
-    await fetch(apiUrl, {
+    var putRes = await fetch(apiUrl, {
       method:'PUT',
       headers:{'Authorization':'token '+token,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
       body:JSON.stringify(body)
     });
-  } catch(e) { console.log('並び順GitHub保存エラー:', e); }
+    if (!putRes.ok) {
+      var errData = await putRes.json();
+      console.error('並び順のGitHub保存に失敗:', errData);
+      return false;
+    }
+    console.log('✓ 並び順をGitHubに保存しました');
+    return true;
+  } catch(e) { console.error('並び順GitHub保存エラー:', e); return false; }
 }
 
 async function loadSortOrderFromGitHub() {
@@ -463,8 +482,20 @@ function saveGas() {
 }
 
 function saveToken() {
-  localStorage.setItem('ghToken_v3', document.getElementById('inToken').value.trim());
+  var v = document.getElementById('inToken').value.trim();
+  localStorage.setItem('ghToken_v3', v);
+  var ts = document.getElementById('inTokenSort');
+  if (ts) ts.value = v;
   alert('✅ トークンを保存しました');
+}
+
+function saveTokenFromSort() {
+  var v = document.getElementById('inTokenSort').value.trim();
+  localStorage.setItem('ghToken_v3', v);
+  document.getElementById('inToken').value = v;
+  var st = document.getElementById('stTokenSort');
+  st.textContent = '✓ 保存しました';
+  st.className = 'st ok';
 }
 
 // ===== 並び替え =====
@@ -631,8 +662,13 @@ function doLock() {
   sortLocked[curOffice] = true;
   localStorage.setItem('sortOrder_v3', JSON.stringify({orders:sortOrders, locked:sortLocked}));
   switchTab(curOffice);
-  saveSortOrderToGitHub().catch(function(e){ console.log(e); });
-  alert('🔒 ' + curOffice + ' の並び順を固定しました。\n\n他のデバイス（現場アプリ）に反映するには、必ず「④ GitHubにアップロード」を押してください。');
+  saveSortOrderToGitHub().then(function(ok) {
+    if (ok) {
+      alert('🔒 ' + curOffice + ' の並び順をGitHubに保存しました。\n次回どのPCでCSVを読み込んでもこの順番が自動適用されます。');
+    } else {
+      alert('⚠️ GitHubへの保存に失敗しました（このPCには保存済みです）。\n②③④のGitHubトークンが正しく入力・保存されているか確認してください。');
+    }
+  });
 }
 
 function doEdit() {
