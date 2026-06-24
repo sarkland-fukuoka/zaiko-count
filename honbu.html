@@ -100,7 +100,7 @@ header{background:#1A1A18;color:#fff;padding:14px 20px;font-size:16px;font-weigh
 <!-- ③ 並び順 -->
 <div class="card" id="secSort" style="display:none">
   <h2>③ 商品の並び順を設定（営業所ごと）</h2>
-  <div class="info">営業所タブを選んでドラッグ＆ドロップで並び替え。「🔒 固定」すると次回CSVを読み込んでもこの順番が維持されます。</div>
+  <div class="info">営業所タブを選んでドラッグ＆ドロップ、または番号入力で並び替え。「🔒 固定」すると保存されます。<strong style="color:#c62828">固定後は必ず下の「④ GitHubにアップロード」を押してください。それまでは他のデバイスに反映されません。</strong></div>
   <div class="sort-tabs" id="sortTabs"></div>
   <div class="sort-ctrl">
     <button class="btn btn-dark btn-sm" id="btnLock" onclick="doLock()">🔒 並び順を固定</button>
@@ -179,10 +179,6 @@ var dragSrc = null;
     document.getElementById('stMaster').textContent = '✓ 保存済み ' + Object.keys(master).length + '件（自動読込）';
     document.getElementById('stMaster').className = 'st ok';
   }
-  // GitHubからマスターを読み込む（非同期）
-  setTimeout(function() {
-    loadMasterFromGitHub();
-  }, 500);
   try {
     var o = JSON.parse(localStorage.getItem('sortOrder_v3') || '{}');
     sortOrders = o.orders || {};
@@ -192,7 +188,92 @@ var dragSrc = null;
   if (g) document.getElementById('inGas').value = g;
   var t = localStorage.getItem('ghToken_v3') || '';
   if (t) document.getElementById('inToken').value = t;
+  // GitHubからマスター・並び順を読み込む（非同期、トークン不要）
+  setTimeout(function() {
+    loadMasterFromGitHub();
+    loadSortOrderFromGitHub();
+  }, 500);
 })();
+
+// ===== GitHub保存・読込（マスター） =====
+async function saveMasterToGitHub() {
+  var token = document.getElementById('inToken').value.trim() || localStorage.getItem('ghToken_v3') || '';
+  if (!token) return;
+  var content = btoa(unescape(encodeURIComponent(JSON.stringify(master))));
+  var apiUrl = 'https://api.github.com/repos/' + GH_USER + '/' + GH_REPO + '/contents/data/master.json';
+  try {
+    var sha = null;
+    try {
+      var r = await fetch(apiUrl, {headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}});
+      if (r.ok) { var d = await r.json(); sha = d.sha; }
+    } catch(e) {}
+    var body = {message:'Update master', content:content};
+    if (sha) body.sha = sha;
+    await fetch(apiUrl, {
+      method:'PUT',
+      headers:{'Authorization':'token '+token,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
+      body:JSON.stringify(body)
+    });
+  } catch(e) { console.log('マスターGitHub保存エラー:', e); }
+}
+
+async function loadMasterFromGitHub() {
+  try {
+    var url = 'https://raw.githubusercontent.com/' + GH_USER + '/' + GH_REPO + '/main/data/master.json?t=' + Date.now();
+    var res = await fetch(url);
+    if (!res.ok) return false;
+    var data = await res.json();
+    if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+      master = data;
+      localStorage.setItem('master_v3', JSON.stringify(master));
+      document.getElementById('stMaster').textContent = '✓ 保存済み ' + Object.keys(master).length + '件（GitHub読込）';
+      document.getElementById('stMaster').className = 'st ok';
+      return true;
+    }
+  } catch(e) { console.log('マスター読込エラー:', e); }
+  return false;
+}
+
+// ===== GitHub保存・読込（並び順） =====
+async function saveSortOrderToGitHub() {
+  var token = document.getElementById('inToken').value.trim() || localStorage.getItem('ghToken_v3') || '';
+  if (!token) return;
+  var payload = {orders:sortOrders, locked:sortLocked};
+  var content = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  var apiUrl = 'https://api.github.com/repos/' + GH_USER + '/' + GH_REPO + '/contents/data/sortOrder.json';
+  try {
+    var sha = null;
+    try {
+      var r = await fetch(apiUrl, {headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}});
+      if (r.ok) { var d = await r.json(); sha = d.sha; }
+    } catch(e) {}
+    var body = {message:'Update sortOrder', content:content};
+    if (sha) body.sha = sha;
+    await fetch(apiUrl, {
+      method:'PUT',
+      headers:{'Authorization':'token '+token,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
+      body:JSON.stringify(body)
+    });
+  } catch(e) { console.log('並び順GitHub保存エラー:', e); }
+}
+
+async function loadSortOrderFromGitHub() {
+  try {
+    var url = 'https://raw.githubusercontent.com/' + GH_USER + '/' + GH_REPO + '/main/data/sortOrder.json?t=' + Date.now();
+    var res = await fetch(url);
+    if (!res.ok) return false;
+    var data = await res.json();
+    if (data && typeof data === 'object') {
+      sortOrders = data.orders || {};
+      sortLocked = data.locked || {};
+      localStorage.setItem('sortOrder_v3', JSON.stringify({orders:sortOrders, locked:sortLocked}));
+      // すでに表示中のタブがあれば再描画
+      if (curOffice) renderSortList(curOffice);
+      return true;
+    }
+  } catch(e) { console.log('並び順読込エラー:', e); }
+  return false;
+}
 
 // CSV解析
 function parseCSV(text) {
@@ -315,7 +396,12 @@ document.getElementById('fStock').addEventListener('change', function(e) {
           document.getElementById('secSort').style.display = '';
           document.getElementById('secUpload').style.display = '';
           document.getElementById('secMasterEdit').style.display = '';
-          initSortTabs(offices);
+          // GitHubの最新並び順を必ず取得してから表示する
+          loadSortOrderFromGitHub().then(function() {
+            initSortTabs(offices);
+          }).catch(function() {
+            initSortTabs(offices);
+          });
           renderMasterEdit();
         }
       }
@@ -545,12 +631,15 @@ function doLock() {
   sortLocked[curOffice] = true;
   localStorage.setItem('sortOrder_v3', JSON.stringify({orders:sortOrders, locked:sortLocked}));
   switchTab(curOffice);
+  saveSortOrderToGitHub().catch(function(e){ console.log(e); });
+  alert('🔒 ' + curOffice + ' の並び順を固定しました。\n\n他のデバイス（現場アプリ）に反映するには、必ず「④ GitHubにアップロード」を押してください。');
 }
 
 function doEdit() {
   sortLocked[curOffice] = false;
   localStorage.setItem('sortOrder_v3', JSON.stringify({orders:sortOrders, locked:sortLocked}));
   switchTab(curOffice);
+  saveSortOrderToGitHub().catch(function(e){ console.log(e); });
 }
 
 // ===== GitHubアップロード =====
